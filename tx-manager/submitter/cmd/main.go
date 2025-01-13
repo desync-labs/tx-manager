@@ -3,6 +3,9 @@ package main
 import (
 	"log/slog"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	gRPC "github.com/desync-labs/tx-manager/submitter/internal/grpc"
 )
@@ -35,11 +38,22 @@ func main() {
 
 	gRPCAdapter := gRPC.NewTransactionSubmitterAdapter()
 
-	err := gRPCAdapter.StartGRPCServer(grpcPortEnv)
-	if err != nil {
-		slog.Error("Failed to start gRPC server: %v", err)
-		return
-	}
+	// Start gRPC server asynchronously in a goroutine
+	go func() {
+		if err := gRPCAdapter.StartGRPCServer(grpcPortEnv); err != nil {
+			slog.Error("Failed to start gRPC server: %v", err)
+		}
+	}()
 
-	slog.Info("Started tx submitter service...")
+	// Listen for interrupt or termination signals for graceful shutdown
+	stopCh := make(chan os.Signal, 1)
+	signal.Notify(stopCh, syscall.SIGINT, syscall.SIGTERM)
+
+	// Block until a signal is received
+	sig := <-stopCh
+	slog.Info("Received signal: " + sig.String() + ". Shutting down...")
+
+	// Graceful shutdown logic (optional additional cleanup)
+	time.Sleep(2 * time.Second)
+	slog.Info("Shutdown complete.")
 }
