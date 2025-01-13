@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+option go_package="./transaction";
+
+// Enum for Transaction Priority (p1, p2, p3)
+enum Priority {
+  PRIORITY_UNSPECIFIED = 0;  // Default value, not specified
+  P1 = 1;                    // High priority
+  P2 = 2;                    // Medium priority
+  P3 = 3;                    // Low priority
+}
+
+// Enum for Transaction Status
+enum TransactionStatus {
+    STATUS_UNSPECIFIED = 0;    // Default value, not specified
+    SUBMITTING = 1;            // Transaction is being submitted
+    PROCESSING = 2;            // Transaction is being processed (signed, etc.)
+    COMPLETED = 3;             // Transaction has been completed successfully
+    ERROR = 4;                 // Transaction encountered an error during execution
+  }
+
+service TransactionSubmitter {
+  // Submit a transaction and receive a unique transaction ID
+  rpc SubmitTransaction (TransactionRequest) returns (TransactionResponse);
+}
+
+// The transaction request sent to the submitter
+message TransactionRequest {
+  string app_name = 1;      // Name of the submitting application
+  Priority priority = 2;      // Priority of the transaction (p1, p2, p3)
+  string tx_data = 3;       // Encoded transaction data (method and parameters)
+}
+
+// Response after submitting the transaction
+message TransactionResponse {
+  string tx_key = 1;        // Unique transaction ID generated
+  TransactionStatus status = 2;        // Status of the submission (e.g., "submitted")
+}
