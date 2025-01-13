@@ -11,6 +11,7 @@ import (
 
 	pb "github.com/desync-labs/tx-manager/submitter/protos/transaction"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
 type TransactionSubmitterAdapter struct {
@@ -32,6 +33,9 @@ func (adapter *TransactionSubmitterAdapter) StartGRPCServer(port string) error {
 
 	// Create a new gRPC server
 	grpcServer := grpc.NewServer()
+
+	//TODO: Add env variable to enable/disable reflection
+	reflection.Register(grpcServer)
 
 	// Register the TransactionSubmitter server with gRPC
 	transactionSubmitterServer := adapter
