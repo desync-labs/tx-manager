@@ -9,22 +9,25 @@ import (
 	"os/signal"
 	"syscall"
 
+	services "github.com/desync-labs/tx-manager/submitter/internal/service"
 	pb "github.com/desync-labs/tx-manager/submitter/protos/transaction"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
 
-type TransactionSubmitterAdapter struct {
-	//api ports.TransactionSubmitterPort // TransactionSubmitter logic
+type GrpcServer struct {
+	submitterService services.SubmitterServiceInterface // TransactionSubmitter logic
 }
 
 // NewAdapter creates a new Adapter
-func NewTransactionSubmitterAdapter() *TransactionSubmitterAdapter {
-	return &TransactionSubmitterAdapter{} //api: api}
+func NewGrpcServer(submitterService services.SubmitterServiceInterface) *GrpcServer {
+	return &GrpcServer{
+		submitterService: submitterService,
+	}
 }
 
 // StartGRPCServer starts the gRPC server in a goroutine and handles graceful shutdown
-func (adapter *TransactionSubmitterAdapter) StartGRPCServer(port string) error {
+func (adapter *GrpcServer) Start(port string) error {
 	// Create a TCP listener on the specified port
 	lis, err := net.Listen("tcp", ":"+port)
 	if err != nil {
@@ -63,7 +66,7 @@ func (adapter *TransactionSubmitterAdapter) StartGRPCServer(port string) error {
 	return nil
 }
 
-func (s *TransactionSubmitterAdapter) SubmitTransaction(ctx context.Context, req *pb.TransactionRequest) (*pb.TransactionResponse, error) {
+func (s *GrpcServer) SubmitTransaction(ctx context.Context, req *pb.TransactionRequest) (*pb.TransactionResponse, error) {
 	// tx := application.Transaction{
 	// 	AppName:  req.GetAppName(),
 	// 	Priority: req.GetPriority(),
@@ -78,6 +81,13 @@ func (s *TransactionSubmitterAdapter) SubmitTransaction(ctx context.Context, req
 	// }
 
 	slog.Info("Received transaction request: %v", req)
+
+	testData := []byte("test")
+	_, err := s.submitterService.SubmitTransaction(1, testData, "test")
+	if err != nil {
+		slog.Error("Failed to submit transaction: %v", err)
+		return nil, err
+	}
 
 	return &pb.TransactionResponse{
 		TxKey:  "1",

@@ -7,18 +7,28 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/desync-labs/tx-manager/submitter/internal/config"
 	gRPC "github.com/desync-labs/tx-manager/submitter/internal/grpc"
+	messageBroker "github.com/desync-labs/tx-manager/submitter/internal/message-broker"
+	services "github.com/desync-labs/tx-manager/submitter/internal/service"
 )
 
-var appEnv = os.Getenv("APP_ENV")
-var grpcPortEnv = os.Getenv("GRPC_PORT_ENV")
+// var appEnv = os.Getenv("APP_ENV")
+// var grpcPortEnv = os.Getenv("GRPC_PORT_ENV")
+// var rabbitMQUrl = os.Getenv("RABBITMQ_URL")
 
 func main() {
 	// Setting up default logger
 	//Todo: Add log level as a configuration
 
+	config, err := config.NewConfig()
+	if err != nil {
+		slog.Error("Error loading config: %v", err)
+		panic(err)
+	}
+
 	logOpts := slog.LevelDebug
-	if appEnv == "production" {
+	if config.Env == "production" {
 		logOpts = slog.LevelInfo
 	}
 
@@ -32,15 +42,21 @@ func main() {
 	slog.Info("Starting tx submitter service...")
 
 	//TODO: Move to a config file
-	if grpcPortEnv == "" {
-		grpcPortEnv = "50051"
+	grpcPortEnv := config.PortNumber
+
+	messageBroker, err := messageBroker.NewRabbitMQPublisher(config.RabitMQUrl)
+	if err != nil {
+		slog.Error("Failed to create message broker: %v", err)
+		return
 	}
 
-	gRPCAdapter := gRPC.NewTransactionSubmitterAdapter()
+	submitterService := services.NewSubmitterService(messageBroker)
+
+	grpcServer := gRPC.NewGrpcServer(submitterService)
 
 	// Start gRPC server asynchronously in a goroutine
 	go func() {
-		if err := gRPCAdapter.StartGRPCServer(grpcPortEnv); err != nil {
+		if err := grpcServer.Start(grpcPortEnv); err != nil {
 			slog.Error("Failed to start gRPC server: %v", err)
 		}
 	}()
@@ -52,6 +68,8 @@ func main() {
 	// Block until a signal is received
 	sig := <-stopCh
 	slog.Info("Received signal: " + sig.String() + ". Shutting down...")
+
+	messageBroker.Close()
 
 	// Graceful shutdown logic (optional additional cleanup)
 	time.Sleep(2 * time.Second)
