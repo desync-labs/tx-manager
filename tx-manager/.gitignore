@@ -1,0 +1,43 @@
+# Ignore the Go binary files
+/bin/
+/obj/
+/vendor/
+
+# Ignore Go-specific directories
+/.vscode/
+/.idea/
+/.GolangCI/
+
+# Ignore Go dependency directory
+/go.sum
+/go.mod
+
+# Ignore logs
+*.log
+
+# Ignore coverage reports
+*.out
+*.coverprofile
+*.gcov
+
+# Ignore IDE configuration files
+*.swp
+*.swo
+*.bak
+*.tmp
+.DS_Store
+
+# Ignore system files
+Thumbs.db
+
+# Ignore local environment settings
+.env
+*.env
+
+# Ignore the container and build-related files
+/.devcontainer/
+/docker-compose.override.yml
+docker-compose.yml
+
+# Ignore test result files
+testdata/
