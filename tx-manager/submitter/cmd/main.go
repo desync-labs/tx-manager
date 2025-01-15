@@ -11,6 +11,7 @@ import (
 	gRPC "github.com/desync-labs/tx-manager/submitter/internal/grpc"
 	messageBroker "github.com/desync-labs/tx-manager/submitter/internal/message-broker"
 	services "github.com/desync-labs/tx-manager/submitter/internal/service"
+	"github.com/go-redis/redis"
 )
 
 // var appEnv = os.Getenv("APP_ENV")
@@ -41,6 +42,20 @@ func main() {
 
 	slog.Info("Starting tx submitter service...")
 
+	slog.Debug("Redis URL: %s", config.RedisUrl)
+
+	// Initialize Redis client
+	redisClient := redis.NewClient(&redis.Options{
+		Addr: config.RedisUrl, // Redis server address
+		DB:   0,               // Default DB
+	})
+
+	_, err = redisClient.Ping().Result()
+	if err != nil {
+		slog.Error("Failed to connect to Redis: %v", err)
+		return
+	}
+
 	//TODO: Move to a config file
 	grpcPortEnv := config.PortNumber
 
@@ -50,7 +65,7 @@ func main() {
 		return
 	}
 
-	submitterService := services.NewSubmitterService(messageBroker)
+	submitterService := services.NewSubmitterService(messageBroker, redisClient)
 
 	grpcServer := gRPC.NewGrpcServer(submitterService)
 
@@ -69,6 +84,7 @@ func main() {
 	sig := <-stopCh
 	slog.Info("Received signal: " + sig.String() + ". Shutting down...")
 
+	redisClient.Close()
 	messageBroker.Close()
 
 	// Graceful shutdown logic (optional additional cleanup)

@@ -13,11 +13,13 @@ const LocalPortNumber = "GRPC_PORT_ENV"
 const RabbitMQUrlKey = "RABBITMQ_URL"
 const RabbitMQUsernameKey = "RABBITMQ_USERNAME"
 const RabbitMQUrlPasswordKey = "RABBITMQ_PASSWORD"
+const RedisUrlKey = "REDIS_URL"
 
 type Config struct {
 	PortNumber string
 	Env        string
 	RabitMQUrl string
+	RedisUrl   string
 }
 
 func NewConfig() (*Config, error) {
@@ -36,13 +38,15 @@ func NewConfig() (*Config, error) {
 	rabitMQUsername := os.Getenv(RabbitMQUsernameKey)
 	rabitMQPassword := os.Getenv(RabbitMQUrlPasswordKey)
 	rabitMQUrl := os.Getenv(RabbitMQUrlKey)
+	redisUrl := os.Getenv(RedisUrlKey)
 
 	//Error loading environment variables
 	if localPortNumber == "" ||
 		env == "" ||
 		rabitMQUsername == "" ||
 		rabitMQPassword == "" ||
-		rabitMQUrl == "" {
+		rabitMQUrl == "" ||
+		redisUrl == "" {
 		slog.Error("Error loading data from environment")
 		return nil, fmt.Errorf("Error loading data from environment")
 	}
@@ -50,7 +54,7 @@ func NewConfig() (*Config, error) {
 	rabitMQUrl = "amqp://" + rabitMQUsername + ":" + rabitMQPassword + "@" + rabitMQUrl
 
 	return &Config{
-		PortNumber: localPortNumber, Env: env, RabitMQUrl: rabitMQUrl}, nil
+		PortNumber: localPortNumber, Env: env, RabitMQUrl: rabitMQUrl, RedisUrl: redisUrl}, nil
 }
 
 func (s *Config) GetEnvironment() string {

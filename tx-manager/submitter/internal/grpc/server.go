@@ -67,30 +67,17 @@ func (adapter *GrpcServer) Start(port string) error {
 }
 
 func (s *GrpcServer) SubmitTransaction(ctx context.Context, req *pb.TransactionRequest) (*pb.TransactionResponse, error) {
-	// tx := application.Transaction{
-	// 	AppName:  req.GetAppName(),
-	// 	Priority: req.GetPriority(),
-	// 	Data:     req.GetTxData(),
-	// }
 
-	// // Use the transaction submitter to process the transaction
-	// // txKey, err := s.submitter.SubmitTransaction(tx)
-	// if err != nil {
-	// 	log.Printf("Failed to submit transaction: %v", err)
-	// 	return nil, err
-	// }
+	slog.Debug("Received transaction request: %v", req)
 
-	slog.Info("Received transaction request: %v", req)
-
-	testData := []byte("test")
-	_, err := s.submitterService.SubmitTransaction(1, testData, "test")
+	txId, err := s.submitterService.SubmitTransaction(req)
 	if err != nil {
 		slog.Error("Failed to submit transaction: %v", err)
 		return nil, err
 	}
 
 	return &pb.TransactionResponse{
-		TxKey:  "1",
+		TxKey:  txId,
 		Status: pb.TransactionStatus_SUBMITTING,
 	}, nil
 }

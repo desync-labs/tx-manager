@@ -1,6 +1,7 @@
 package message_broker
 
 import (
+	"encoding/json"
 	"fmt"
 	"log/slog"
 
@@ -51,7 +52,7 @@ func NewRabbitMQPublisher(amqpURI string) (*RabbitMQPublisher, error) {
 }
 
 // Publish publishes the transaction to the appropriate RabbitMQ queue based on priority
-func (r *RabbitMQPublisher) Publish(priority int, data []byte, client string) (string, error) {
+func (r *RabbitMQPublisher) Publish(priority int, data interface{}) error {
 	var queueName string
 
 	// Determine the queue based on priority
@@ -63,34 +64,37 @@ func (r *RabbitMQPublisher) Publish(priority int, data []byte, client string) (s
 	case 3:
 		queueName = "p3"
 	default:
-		return "", fmt.Errorf("invalid priority %d", priority)
+		return fmt.Errorf("invalid priority %d", priority)
 	}
 
-	// Create the message to publish (message body + routing information)
-	message := fmt.Sprintf("Client: %s, Data: %s", client, string(data))
+	// Serialize the provided data (which can be any JSON object)
+	messageData, err := json.Marshal(data)
+	if err != nil {
+		return fmt.Errorf("failed to serialize message data: %w", err)
+	}
 
 	// Publish the message to the appropriate queue
-	err := r.channel.Publish(
+	err = r.channel.Publish(
 		"",        // Default exchange
 		queueName, // The routing key (queue name)
 		false,     // Mandatory
 		false,     // Immediate
 		amqp.Publishing{
-			ContentType: "text/plain",
-			Body:        []byte(message),
+			ContentType: "application/json", // Using application/json for content type
+			Body:        messageData,        // The serialized JSON object
 		},
 	)
 
 	if err != nil {
-		return "", fmt.Errorf("failed to publish message: %w", err)
+		return fmt.Errorf("failed to publish message: %w", err)
 	}
 
 	slog.Debug("Publishing message to message broker",
 		"queue", queueName,
-		"message", message,
+		"message", messageData,
 	)
 
-	return message, nil
+	return nil
 }
 
 // Close gracefully shuts down the RabbitMQ connection and channel
