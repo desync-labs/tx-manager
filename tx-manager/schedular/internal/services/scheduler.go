@@ -24,9 +24,12 @@ type SchedulerService struct {
 	ctx            context.Context
 	mu             sync.RWMutex
 	cancel         context.CancelFunc
+	workerPoolSize int
+	taskQueue      chan domain.Transaction
+	wg             sync.WaitGroup
 }
 
-func NewSchedulerService(messageBroker broker.MessageBrokerInterface, priorities []string, ctx context.Context) *SchedulerService {
+func NewSchedulerService(messageBroker broker.MessageBrokerInterface, priorities []string, ctx context.Context, workerPoolSize int) *SchedulerService {
 	ctxSchedularService, cancel := context.WithCancel(ctx)
 	mb := &SchedulerService{
 		messageBroker:  messageBroker,
@@ -34,6 +37,8 @@ func NewSchedulerService(messageBroker broker.MessageBrokerInterface, priorities
 		priorities:     priorities,
 		ctx:            ctxSchedularService,
 		cancel:         cancel,
+		workerPoolSize: workerPoolSize,
+		taskQueue:      make(chan domain.Transaction, 100),
 	}
 	return mb
 }
@@ -49,6 +54,12 @@ func (s *SchedulerService) SetupTransactionListener() error {
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	// Start worker pool to process the transactions as they recieve from message broker
+	for i := 0; i < s.workerPoolSize; i++ {
+		s.wg.Add(1)
+		go s.worker(i + 1)
+	}
 
 	for _, p := range s.priorities {
 		s.chTransactions[p] = make(chan domain.Transaction)
@@ -76,8 +87,16 @@ func (s *SchedulerService) listenForNewTransactionForPriority(priority string, c
 
 	for {
 		select {
-		case tx := <-chNewTransaction:
-			go s.scheduleTransaction(&tx)
+		case tx, ok := <-chNewTransaction:
+			if !ok {
+				slog.Info("Transaction channel closed", "priority", priority)
+				return
+			}
+			select {
+			case s.taskQueue <- tx:
+			case <-s.ctx.Done():
+				return
+			}
 		case <-s.ctx.Done():
 			slog.Info("Shutting down transaction listener", "priority", priority)
 			s.closePriorityChannel(priority)
@@ -115,4 +134,23 @@ func (s *SchedulerService) Shutdown() {
 	s.mu.Unlock()
 
 	slog.Info("Scheduler Service shut down gracefully")
+}
+
+// Worker function to process tasks
+func (s *SchedulerService) worker(id int) {
+	defer s.wg.Done()
+	slog.Debug("Worker started", "worker_id", id)
+	for {
+		select {
+		case tx, ok := <-s.taskQueue:
+			if !ok {
+				slog.Debug("Worker stopping", "worker_id", id)
+				return
+			}
+			s.scheduleTransaction(&tx)
+		case <-s.ctx.Done():
+			slog.Debug("Worker received shutdown signal", "worker_id", id)
+			return
+		}
+	}
 }

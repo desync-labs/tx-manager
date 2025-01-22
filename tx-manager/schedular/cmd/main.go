@@ -65,7 +65,7 @@ func main() {
 	ctxSchedularService, cancelSchedularService := context.WithCancel(context.Background())
 	defer cancelSchedularService()
 
-	schedularService := services.NewSchedulerService(messageBroker, priorities, ctxSchedularService)
+	schedularService := services.NewSchedulerService(messageBroker, priorities, ctxSchedularService, 10)
 	schedularService.SetupTransactionListener()
 
 	// Listen for interrupt or termination signals for graceful shutdown
