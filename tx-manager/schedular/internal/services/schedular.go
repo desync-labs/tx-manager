@@ -20,11 +20,15 @@ type SchedularServiceInterface interface {
 
 type SchedularService struct {
 	messageBroker broker.MessageBrokerInterface
+
+	// Map of priority to channel
+	chPriority map[string]chan domain.Transaction
 }
 
 func NewSchedularService(messageBroker broker.MessageBrokerInterface) *SchedularService {
 	mb := &SchedularService{
 		messageBroker: messageBroker,
+		chPriority:    make(map[string]chan domain.Transaction),
 	}
 	return mb
 }
@@ -38,52 +42,45 @@ func (s *SchedularService) SetupTransactionListner() error {
 	// Listen for new transactions
 	slog.Info("Setting up transaction listener")
 
-	//	go s.listenForNewTransactionForPriority("p0")
-
-	// Listen for new transactions for priority p0
-	err := s.listenForNewTransactionForPriority("p1")
-	if err != nil {
-		slog.Error("Failed to listen for new transactions", "error", err)
-		return err
-	}
-
-	// Listen for new transactions for priority p1
-	err = s.listenForNewTransactionForPriority("p2")
-	if err != nil {
-		slog.Error("Failed to listen for new transactions", "error", err)
-		return err
-	}
-
-	// Listen for new transactions for priority p2
-	err = s.listenForNewTransactionForPriority("p3")
-	if err != nil {
-		slog.Error("Failed to listen for new transactions", "error", err)
-		return err
+	priorties := []string{"p1", "p2", "p3"}
+	for _, p := range priorties {
+		s.chPriority[p] = make(chan domain.Transaction)
+		go s.listenForNewTransactionForPriority(p, s.chPriority[p])
 	}
 
 	return nil
 }
 
 // priority will be p0, p1 or p2
-func (s *SchedularService) listenForNewTransactionForPriority(priority string) error {
+func (s *SchedularService) listenForNewTransactionForPriority(priority string, chNewTransaction chan domain.Transaction) error {
 	// Listen for new transactions
 	slog.Info("Listening for new transactions", "priority", priority)
 
-	err := s.messageBroker.ListenForSubmitterMessages(priority, func(body []byte, ctx context.Context) {
-		tx := &domain.Transaction{}
-		err := json.Unmarshal(body, tx)
-		if err != nil {
-			slog.Error("Failed to unmarshal message", "error", err)
-			return
+	//Why is this in a go routine?
+	go func() {
+		s.messageBroker.ListenForSubmitterMessages(priority, func(body []byte, ctx context.Context) {
+			tx := &domain.Transaction{}
+			err := json.Unmarshal(body, tx)
+			if err != nil {
+				slog.Error("Failed to unmarshal message", "error", err)
+				// return
+			} else {
+				chNewTransaction <- *tx
+			}
+		})
+	}()
+
+	for {
+		select {
+		case tx := <-chNewTransaction:
+			go s.recieveTransaction(&tx)
 		}
-
-		s.recieveTransaction(tx)
-	})
-
-	if err != nil {
-		slog.Error("Failed to listen for messages", "error", err)
-		return err
 	}
+
+	// if err != nil {
+	// 	slog.Error("Failed to listen for messages", "error", err)
+	// 	return err
+	// }
 
 	return nil
 }
