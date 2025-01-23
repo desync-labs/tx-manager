@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 
@@ -8,6 +9,11 @@ import (
 	broker "github.com/desync-labs/tx-manager/submitter/internal/message-broker/interface"
 	pb "github.com/desync-labs/tx-manager/submitter/protos/transaction"
 	"github.com/go-redis/redis"
+)
+
+const (
+	// Topic to submit transactions, for rabbitmq this is exchange name
+	submit_topic = "tx_submit"
 )
 
 type SubmitterServiceInterface interface {
@@ -46,7 +52,7 @@ func (s *SubmitterService) SubmitTransaction(req *pb.TransactionRequest) (string
 	tx.Id = txID
 
 	//publish the transaction to the message broker
-	return tx.Id, s.messageBroker.Publish(tx.Priority, tx)
+	return tx.Id, s.messageBroker.PublishObject(submit_topic, tx, int(req.GetPriority()), context.Background())
 }
 
 // generateTransactionID generates a unique transaction ID using Redis INCR command

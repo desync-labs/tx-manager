@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -59,7 +60,7 @@ func main() {
 	//TODO: Move to a config file
 	grpcPortEnv := config.PortNumber
 
-	messageBroker, err := messageBroker.NewRabbitMQPublisher(config.RabitMQUrl)
+	messageBroker, err := messageBroker.NewRabbitMQ(config.RabitMQUrl, context.Background())
 	if err != nil {
 		slog.Error("Failed to create message broker: %v", err)
 		return
