@@ -9,6 +9,8 @@ import (
 
 	// gRPC "github.com/desync-labs/tx-manager/submitter/internal/grpc"
 	"github.com/desync-labs/tx-manager/key-manager/internal/config"
+	gRPC "github.com/desync-labs/tx-manager/key-manager/internal/grpc"
+	services "github.com/desync-labs/tx-manager/key-manager/internal/services"
 	"github.com/go-redis/redis"
 )
 
@@ -40,7 +42,7 @@ func main() {
 
 	slog.Info("Starting key-manager service...")
 
-	slog.Debug("Redis URL: %s", config.RedisUrl)
+	slog.Debug("Redis URL", "url", config.RedisUrl)
 
 	// Initialize Redis client
 	redisClient := redis.NewClient(&redis.Options{
@@ -57,8 +59,8 @@ func main() {
 	//TODO: Move to a config file
 	grpcPortEnv := config.PortNumber
 
-	//	submitterService := services.NewSubmitterService(messageBroker, redisClient)
-	grpcServer := gRPC.NewGrpcServer(keyManagerService, redisClient)
+	keyManagerService := services.NewKeyManagerService()
+	grpcServer := gRPC.NewGrpcServer(keyManagerService)
 
 	// Start gRPC server asynchronously in a goroutine
 	go func() {
