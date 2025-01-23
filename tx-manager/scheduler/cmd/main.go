@@ -11,6 +11,8 @@ import (
 	"github.com/desync-labs/tx-manager/scheduler/internal/config"
 	messageBroker "github.com/desync-labs/tx-manager/scheduler/internal/message-broker"
 	services "github.com/desync-labs/tx-manager/scheduler/internal/services"
+	pb "github.com/desync-labs/tx-manager/scheduler/protos/key-manager"
+	"google.golang.org/grpc"
 )
 
 // var appEnv = os.Getenv("APP_ENV")
@@ -53,6 +55,17 @@ func main() {
 	// 	return
 	// }
 
+	var grpcOpts []grpc.DialOption
+	grpcOpts = append(grpcOpts, grpc.WithInsecure())
+	conn, err := grpc.NewClient(config.KeyManagerServerUrl, grpcOpts...)
+	if err != nil {
+		slog.Error("Failed to create gRPC connection: %v", err)
+		return
+	}
+	keyManagerGrpcClient := pb.NewKeyManagerServiceClient(conn)
+
+	defer conn.Close()
+
 	messageBroker, err := messageBroker.NewRabbitMQ(config.RabitMQUrl, context.Background())
 	if err != nil {
 		slog.Error("Failed to create message broker: %v", err)
@@ -64,7 +77,7 @@ func main() {
 	ctxSchedularService, cancelSchedularService := context.WithCancel(context.Background())
 	defer cancelSchedularService()
 
-	schedularService := services.NewSchedulerService(messageBroker, priorities, ctxSchedularService, 10)
+	schedularService := services.NewSchedulerService(messageBroker, keyManagerGrpcClient, priorities, ctxSchedularService, 10)
 	schedularService.SetupTransactionListener()
 
 	// Listen for interrupt or termination signals for graceful shutdown

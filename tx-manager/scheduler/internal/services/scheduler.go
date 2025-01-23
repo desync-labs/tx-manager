@@ -8,6 +8,7 @@ import (
 
 	"github.com/desync-labs/tx-manager/scheduler/internal/domain"
 	broker "github.com/desync-labs/tx-manager/scheduler/internal/message-broker/interface"
+	pb "github.com/desync-labs/tx-manager/scheduler/protos/key-manager"
 )
 
 const (
@@ -17,40 +18,37 @@ const (
 
 // TODO: naming convention for interface
 type SchedulerServiceInterface interface {
-	ScheduleTransaction()
+	scheduleTransaction(tx *domain.Transaction)
 	SetupTransactionListener() error
 }
 
 type SchedulerService struct {
 	messageBroker broker.MessageBrokerInterface
 	// Map of priority to channel
-	chTransactions map[int]chan domain.Transaction
-	priorities     []int
-	ctx            context.Context
-	mu             sync.RWMutex
-	cancel         context.CancelFunc
-	workerPoolSize int
-	taskQueue      chan domain.Transaction
-	wg             sync.WaitGroup
+	chTransactions          map[int]chan domain.Transaction
+	priorities              []int
+	ctx                     context.Context
+	mu                      sync.RWMutex
+	cancel                  context.CancelFunc
+	workerPoolSize          int
+	taskQueue               chan domain.Transaction
+	wg                      sync.WaitGroup
+	keyManagerServiceClient pb.KeyManagerServiceClient
 }
 
-func NewSchedulerService(messageBroker broker.MessageBrokerInterface, priorities []int, ctx context.Context, workerPoolSize int) *SchedulerService {
+func NewSchedulerService(messageBroker broker.MessageBrokerInterface, keyManagerServiceClient pb.KeyManagerServiceClient, priorities []int, ctx context.Context, workerPoolSize int) *SchedulerService {
 	ctxSchedularService, cancel := context.WithCancel(ctx)
 	mb := &SchedulerService{
-		messageBroker:  messageBroker,
-		chTransactions: make(map[int]chan domain.Transaction),
-		priorities:     priorities,
-		ctx:            ctxSchedularService,
-		cancel:         cancel,
-		workerPoolSize: workerPoolSize,
-		taskQueue:      make(chan domain.Transaction, 100),
+		messageBroker:           messageBroker,
+		chTransactions:          make(map[int]chan domain.Transaction),
+		priorities:              priorities,
+		ctx:                     ctxSchedularService,
+		cancel:                  cancel,
+		workerPoolSize:          workerPoolSize,
+		taskQueue:               make(chan domain.Transaction, 100),
+		keyManagerServiceClient: keyManagerServiceClient,
 	}
 	return mb
-}
-
-func (s *SchedulerService) ScheduleTransaction() {
-	// Schedule the transaction
-	slog.Info("Scheduling transaction")
 }
 
 func (s *SchedulerService) SetupTransactionListener() error {
@@ -121,9 +119,28 @@ func (s *SchedulerService) closePriorityChannel(priority int) {
 	}
 }
 
+// Use 2-phase commit approach to first lock the key for transaction and then call executer to perform execution
 func (s *SchedulerService) scheduleTransaction(tx *domain.Transaction) {
 	// Receive the transaction
 	slog.Info("Schedule new transaction", "id", tx.Id)
+	resp, err := s.keyManagerServiceClient.AssignKey(context.Background(), &pb.KeyManagerRequest{
+		TxId:     tx.Id,
+		Priority: pb.Priority(tx.Priority),
+	})
+
+	//TODO: Handle error, either retry or add to dead letter queue
+	if err != nil {
+		slog.Error("Failed to assign key, add transaction to dead letter queue", "error", err)
+		return
+	}
+
+	//TODO: Handle no key, add to dead letter queue
+	if !resp.Success {
+		slog.Error("No key avaiable, adding to dead letter queue", "tx-id", tx.Id)
+		return
+	}
+
+	slog.Info("Key assigned successfully", "tx-id", tx.Id)
 }
 
 func (s *SchedulerService) Shutdown() {
