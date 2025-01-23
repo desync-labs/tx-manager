@@ -6,8 +6,8 @@ import (
 	"log/slog"
 	"sync"
 
-	"github.com/desync-labs/tx-manager/schedular/internal/domain"
-	broker "github.com/desync-labs/tx-manager/schedular/internal/message-broker/interface"
+	"github.com/desync-labs/tx-manager/scheduler/internal/domain"
+	broker "github.com/desync-labs/tx-manager/scheduler/internal/message-broker/interface"
 )
 
 // TODO: naming convention for interface

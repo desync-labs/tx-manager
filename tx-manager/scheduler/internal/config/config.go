@@ -60,5 +60,5 @@ func (s *Config) GetEnvironment() string {
 }
 
 func (s *Config) GetApplicationName() string {
-	return "tx-schedular"
+	return "tx-scheduler"
 }

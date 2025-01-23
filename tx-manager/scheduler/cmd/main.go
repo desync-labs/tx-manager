@@ -8,10 +8,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/desync-labs/tx-manager/schedular/internal/config"
-	// gRPC "github.com/desync-labs/tx-manager/submitter/internal/grpc"
-	messageBroker "github.com/desync-labs/tx-manager/schedular/internal/message-broker"
-	services "github.com/desync-labs/tx-manager/schedular/internal/services"
+	"github.com/desync-labs/tx-manager/scheduler/internal/config"
+	messageBroker "github.com/desync-labs/tx-manager/scheduler/internal/message-broker"
+	services "github.com/desync-labs/tx-manager/scheduler/internal/services"
 )
 
 // var appEnv = os.Getenv("APP_ENV")
