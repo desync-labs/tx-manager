@@ -13,12 +13,12 @@ import (
 
 const (
 	// Topic to submit transactions, for rabbitmq this is exchange name
-	submit_topic = "tx_submit"
+	submit_topic  = "tx_submit"
+	execute_topic = "tx_executor"
 )
 
 // TODO: naming convention for interface
 type SchedulerServiceInterface interface {
-	scheduleTransaction(tx *domain.Transaction)
 	SetupTransactionListener() error
 }
 
@@ -141,6 +141,9 @@ func (s *SchedulerService) scheduleTransaction(tx *domain.Transaction) {
 	}
 
 	slog.Info("Key assigned successfully", "tx-id", tx.Id)
+
+	//TODO: Sent transaction to another exhange tx_execute executer will pick it up for execution
+	s.messageBroker.PublishObject(execute_topic, tx, tx.Priority, context.Background())
 }
 
 func (s *SchedulerService) Shutdown() {

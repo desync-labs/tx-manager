@@ -136,13 +136,13 @@ func (r *RabbitMQ) ListenForMessages(exchangeName string, priority int, callback
 
 	// Start consuming messages from the queue
 	msgs, err := r.ch.Consume(
-		rk,    // queue
-		"",    // consumer
-		false, // auto-ack (set to false for manual ack)
-		false, // exclusive
-		false, // no-local
-		false, // no-wait
-		nil,   // args
+		ex.Queue(rk), // queue
+		"",           // consumer
+		false,        // auto-ack (set to false for manual ack)
+		false,        // exclusive
+		false,        // no-local
+		false,        // no-wait
+		nil,          // args
 	)
 	if err != nil {
 		return fmt.Errorf("failed to register a consumer for queue %s: %w", rk, err)
@@ -227,12 +227,12 @@ func (r *RabbitMQ) setupRouting() error {
 		for _, rk := range ex.routingKeys {
 			// Declare the queue
 			queue, err := r.ch.QueueDeclare(
-				rk,    // name
-				true,  // durable
-				false, // delete when unused
-				false, // exclusive
-				false, // no-wait
-				nil,   // arguments
+				ex.Queue(rk), // name
+				true,         // durable
+				false,        // delete when unused
+				false,        // exclusive
+				false,        // no-wait
+				nil,          // arguments
 			)
 			if err != nil {
 				return fmt.Errorf("failed to declare queue %s: %w", rk, err)

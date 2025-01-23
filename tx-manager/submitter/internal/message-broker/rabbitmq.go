@@ -227,12 +227,12 @@ func (r *RabbitMQ) setupRouting() error {
 		for _, rk := range ex.routingKeys {
 			// Declare the queue
 			queue, err := r.ch.QueueDeclare(
-				rk,    // name
-				true,  // durable
-				false, // delete when unused
-				false, // exclusive
-				false, // no-wait
-				nil,   // arguments
+				ex.Queue(rk), // name
+				true,         // durable
+				false,        // delete when unused
+				false,        // exclusive
+				false,        // no-wait
+				nil,          // arguments
 			)
 			if err != nil {
 				return fmt.Errorf("failed to declare queue %s: %w", rk, err)
