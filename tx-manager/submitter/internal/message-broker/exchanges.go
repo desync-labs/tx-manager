@@ -17,10 +17,6 @@ type Exchange struct {
 	routingKeys  []string
 }
 
-func (e *Exchange) QueueName(priority int) string {
-	return fmt.Sprintf("%s_%d", e.exchangeName, priority)
-}
-
 type Exchanges struct {
 	Exchanges []*Exchange
 }

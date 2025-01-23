@@ -59,7 +59,7 @@ func main() {
 		return
 	}
 
-	priorities := []string{"p1", "p2", "p3"}
+	priorities := []int{1, 2, 3}
 
 	ctxSchedularService, cancelSchedularService := context.WithCancel(context.Background())
 	defer cancelSchedularService()

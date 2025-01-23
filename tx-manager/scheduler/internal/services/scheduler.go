@@ -10,6 +10,11 @@ import (
 	broker "github.com/desync-labs/tx-manager/scheduler/internal/message-broker/interface"
 )
 
+const (
+	// Topic to submit transactions, for rabbitmq this is exchange name
+	submit_topic = "tx_submit"
+)
+
 // TODO: naming convention for interface
 type SchedulerServiceInterface interface {
 	ScheduleTransaction()
@@ -19,8 +24,8 @@ type SchedulerServiceInterface interface {
 type SchedulerService struct {
 	messageBroker broker.MessageBrokerInterface
 	// Map of priority to channel
-	chTransactions map[string]chan domain.Transaction
-	priorities     []string
+	chTransactions map[int]chan domain.Transaction
+	priorities     []int
 	ctx            context.Context
 	mu             sync.RWMutex
 	cancel         context.CancelFunc
@@ -29,11 +34,11 @@ type SchedulerService struct {
 	wg             sync.WaitGroup
 }
 
-func NewSchedulerService(messageBroker broker.MessageBrokerInterface, priorities []string, ctx context.Context, workerPoolSize int) *SchedulerService {
+func NewSchedulerService(messageBroker broker.MessageBrokerInterface, priorities []int, ctx context.Context, workerPoolSize int) *SchedulerService {
 	ctxSchedularService, cancel := context.WithCancel(ctx)
 	mb := &SchedulerService{
 		messageBroker:  messageBroker,
-		chTransactions: make(map[string]chan domain.Transaction),
+		chTransactions: make(map[int]chan domain.Transaction),
 		priorities:     priorities,
 		ctx:            ctxSchedularService,
 		cancel:         cancel,
@@ -70,11 +75,11 @@ func (s *SchedulerService) SetupTransactionListener() error {
 }
 
 // priority will be p0, p1 or p2
-func (s *SchedulerService) listenForNewTransactionForPriority(priority string, chNewTransaction chan domain.Transaction) {
+func (s *SchedulerService) listenForNewTransactionForPriority(priority int, chNewTransaction chan domain.Transaction) {
 	// Listen for new transactions
 	slog.Info("Listening for new transactions", "priority", priority)
 
-	s.messageBroker.ListenForSubmitterMessages(priority, func(body []byte, ctx context.Context) {
+	s.messageBroker.ListenForMessages(submit_topic, priority, func(body []byte, ctx context.Context) {
 		tx := &domain.Transaction{}
 		err := json.Unmarshal(body, tx)
 		if err != nil {
@@ -105,7 +110,7 @@ func (s *SchedulerService) listenForNewTransactionForPriority(priority string, c
 	}
 }
 
-func (s *SchedulerService) closePriorityChannel(priority string) {
+func (s *SchedulerService) closePriorityChannel(priority int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

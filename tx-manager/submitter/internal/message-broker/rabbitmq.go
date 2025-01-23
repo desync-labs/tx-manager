@@ -129,20 +129,23 @@ func (r *RabbitMQ) ListenForMessages(exchangeName string, priority int, callback
 		return err
 	}
 
-	queueName := ex.QueueName(priority)
+	rk, err := ex.RoutingKey(priority)
+	if err != nil {
+		return fmt.Errorf("failed to get routing key from priority: %w", err)
+	}
 
 	// Start consuming messages from the queue
 	msgs, err := r.ch.Consume(
-		queueName, // queue
-		"",        // consumer
-		false,     // auto-ack (set to false for manual ack)
-		false,     // exclusive
-		false,     // no-local
-		false,     // no-wait
-		nil,       // args
+		rk,    // queue
+		"",    // consumer
+		false, // auto-ack (set to false for manual ack)
+		false, // exclusive
+		false, // no-local
+		false, // no-wait
+		nil,   // args
 	)
 	if err != nil {
-		return fmt.Errorf("failed to register a consumer for queue %s: %w", queueName, err)
+		return fmt.Errorf("failed to register a consumer for queue %s: %w", rk, err)
 	}
 
 	// Handle messages in a separate goroutine
@@ -150,11 +153,11 @@ func (r *RabbitMQ) ListenForMessages(exchangeName string, priority int, callback
 		for {
 			select {
 			case <-r.ctx.Done():
-				slog.Info("Shutting down consumer", "queue", queueName)
+				slog.Info("Shutting down consumer", "queue", rk)
 				return
 			case msg, ok := <-msgs:
 				if !ok {
-					slog.Info("Message channel closed", "queue", queueName)
+					slog.Info("Message channel closed", "queue", rk)
 					return
 				}
 
@@ -163,7 +166,7 @@ func (r *RabbitMQ) ListenForMessages(exchangeName string, priority int, callback
 
 				// Acknowledge the message after processing
 				if err := msg.Ack(false); err != nil {
-					slog.Error("Failed to acknowledge message", "queue", queueName, "error", err)
+					slog.Error("Failed to acknowledge message", "queue", rk, "error", err)
 				}
 			}
 		}

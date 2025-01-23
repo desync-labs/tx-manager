@@ -3,10 +3,7 @@ package message_broker
 import "context"
 
 type MessageBrokerInterface interface {
-	PublishToQueue(queueName string, message float64, ctx context.Context) error
-	// Deprecated: Use ListenForSubmitterMessages instead
-	ListenForMessages(queueName string, callback func([]byte, context.Context)) error
-	ListenForSubmitterMessages(priority string, callback func([]byte, context.Context)) error
-	Close() error
-	Connect() error
+	Publish(topic string, data string, priority int, ctx context.Context) error
+	PublishObject(topic string, data interface{}, priority int, ctx context.Context) error
+	ListenForMessages(topic string, priority int, callback func([]byte, context.Context)) error
 }
