@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+option go_package="./key-manager";
+
+// Enum for Transaction Priority (p1, p2, p3)
+enum Priority {
+  PRIORITY_UNSPECIFIED = 0;  // Default value, not specified
+  P1 = 1;                    // High priority
+  P2 = 2;                    // Medium priority
+  P3 = 3;                    // Low priority
+}
+
+service KeyManagerService {
+  // Submit a transaction and receive a unique transaction ID
+  rpc AssignKey (KeyManagerRequest) returns (KeyAssigmentResponse);
+  rpc GetKey (KeyManagerRequest) returns (KeyFetchResponse);
+}
+
+// The transaction request sent to the submitter
+message KeyManagerRequest {
+  string tx_id = 1;      // Name of the submitting application
+  Priority priority = 2;      // Priority of the transaction (p1, p2, p3)
+}
+
+message KeyAssigmentResponse {
+  bool success = 1;  // Status of key assignment
+}
+
+message KeyFetchResponse {
+  string key = 1;
+}
