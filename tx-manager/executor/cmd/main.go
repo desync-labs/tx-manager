@@ -78,6 +78,10 @@ func main() {
 	defer cancelExecutorService()
 
 	executorService := services.NewExecutorService(messageBroker, keyManagerGrpcClient, priorities, ctxExecutorService, 10)
+
+	//Netwotkid and url to be moved to config
+	evm := services.NewEVMTransaction("https://erpc.apothem.network")
+	executorService.RegisterTransactionExecutor(51, evm)
 	executorService.SetupTransactionListener()
 
 	// Listen for interrupt or termination signals for graceful shutdown

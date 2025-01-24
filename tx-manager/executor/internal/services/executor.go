@@ -16,9 +16,12 @@ const (
 	execute_topic = "tx_executor"
 )
 
-// TODO: naming convention for interface
 type ExecutorServiceInterface interface {
 	SetupTransactionListener() error
+}
+
+type TransactionExecutorInterface interface {
+	Execute(key string, tx *domain.Transaction) error
 }
 
 type ExecutorService struct {
@@ -33,6 +36,9 @@ type ExecutorService struct {
 	taskQueue               chan domain.Transaction
 	wg                      sync.WaitGroup
 	keyManagerServiceClient pb.KeyManagerServiceClient
+
+	// map of transaction executor, where key is network id
+	registeredTxExecutors map[int]TransactionExecutorInterface
 }
 
 func NewExecutorService(messageBroker broker.MessageBrokerInterface, keyManagerServiceClient pb.KeyManagerServiceClient, priorities []int, ctx context.Context, workerPoolSize int) *ExecutorService {
@@ -46,8 +52,13 @@ func NewExecutorService(messageBroker broker.MessageBrokerInterface, keyManagerS
 		workerPoolSize:          workerPoolSize,
 		taskQueue:               make(chan domain.Transaction, 100),
 		keyManagerServiceClient: keyManagerServiceClient,
+		registeredTxExecutors:   make(map[int]TransactionExecutorInterface),
 	}
 	return ex
+}
+
+func (e *ExecutorService) RegisterTransactionExecutor(networkID int, txExecutor TransactionExecutorInterface) {
+	e.registeredTxExecutors[networkID] = txExecutor
 }
 
 func (e *ExecutorService) SetupTransactionListener() error {
@@ -118,9 +129,34 @@ func (e *ExecutorService) closePriorityChannel(priority int) {
 	}
 }
 
-func (e *ExecutorService) scheduleTransaction(tx *domain.Transaction) {
+func (e *ExecutorService) processTransaction(tx *domain.Transaction) {
 	// Receive the transaction
-	slog.Info("Execute new transaction", "id", tx.Id)
+	slog.Info("Processing transaction", "id", tx.Id)
+
+	//Fetch the key from key manager
+	key, err := e.keyManagerServiceClient.GetKey(e.ctx, &pb.KeyManagerRequest{
+		TxId:     tx.Id,
+		Priority: pb.Priority(tx.Priority),
+	})
+
+	//Todo: add the transaction to DLQ
+	if err != nil {
+		slog.Error("Failed to get key from key manager", "error", err)
+		return
+	}
+
+	// Execute the transaction
+	slog.Info("Transaction executed with key", "id", tx.Id, "key", key.Key)
+	e.executingTransaction(key.Key, tx)
+}
+
+func (e *ExecutorService) executingTransaction(key string, tx *domain.Transaction) error {
+	ex, ok := e.registeredTxExecutors[51]
+	if !ok {
+		slog.Error("No transaction executor found for network", "network_id", 51)
+		return nil
+	}
+	return ex.Execute(key, tx)
 }
 
 func (e *ExecutorService) Shutdown() {
@@ -149,7 +185,7 @@ func (e *ExecutorService) worker(id int) {
 				slog.Debug("Worker stopping", "worker_id", id)
 				return
 			}
-			e.scheduleTransaction(&tx)
+			e.processTransaction(&tx)
 		case <-e.ctx.Done():
 			slog.Debug("Worker received shutdown signal", "worker_id", id)
 			return
