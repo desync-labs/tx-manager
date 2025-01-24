@@ -36,7 +36,11 @@ func NewSubmitterService(messageBroker broker.MessageBrokerInterface, redisClien
 func (s *SubmitterService) SubmitTransaction(req *pb.TransactionRequest) (string, error) {
 	//Generate the unique id for the transaction
 
-	tx, err := domain.NewTransaction(req.GetAppName(), int(req.GetPriority()), []byte(req.GetTxData()))
+	tx, err := domain.NewTransaction(req.GetAppName(),
+		int(req.GetPriority()),
+		int(req.GetNetwork()),
+		string(req.GetContractAddress()),
+		[]byte(req.GetTxData()))
 
 	if err != nil {
 		slog.Error("Failed to create transaction: %v", err)

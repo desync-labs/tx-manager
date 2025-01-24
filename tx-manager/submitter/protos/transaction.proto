@@ -10,6 +10,15 @@ enum Priority {
   P3 = 3;                    // Low priority
 }
 
+// Enum for Network
+enum Network {
+  NETWORK_UNSPECIFIED = 0;  // Default value, not specified
+  XDC              = 50;    //XDC mainnet
+  Apothem          = 51;    //XDC testnet
+  Solana           = 900;   //Solana Mainnet                 
+  SolanaDevnet     = 901;   //Solana Devnet                
+}
+
 // Enum for Transaction Status
 enum TransactionStatus {
     STATUS_UNSPECIFIED = 0;    // Default value, not specified
@@ -26,9 +35,11 @@ service TransactionSubmitter {
 
 // The transaction request sent to the submitter
 message TransactionRequest {
-  string app_name = 1;      // Name of the submitting application
-  Priority priority = 2;      // Priority of the transaction (p1, p2, p3)
-  string tx_data = 3;       // Encoded transaction data (method and parameters)
+  string app_name = 1;              // Name of the submitting application
+  Priority priority = 2;            // Priority of the transaction (p1, p2, p3)
+  Network network = 3;              // Network to submit the transaction
+  string contract_address = 4;      // Contract address 
+  string tx_data = 5;               // Encoded transaction data (method and parameters)
 }
 
 // Response after submitting the transaction

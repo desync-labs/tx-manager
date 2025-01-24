@@ -7,14 +7,16 @@ import (
 
 // Transaction is a domain model for a transaction
 type Transaction struct {
-	Id          string
-	AppName     string
-	Priority    int
-	Data        []byte
-	SubmittedAt time.Time
+	Id              string
+	AppName         string
+	Priority        int
+	NetworkID       int
+	contractAddress string
+	Data            []byte
+	SubmittedAt     time.Time
 }
 
-func NewTransaction(appName string, priority int, data []byte) (*Transaction, error) {
+func NewTransaction(appName string, priority int, network_id int, contract_addr string, data []byte) (*Transaction, error) {
 
 	//Validate and prepare the transaction data
 	//validate the request
@@ -31,10 +33,20 @@ func NewTransaction(appName string, priority int, data []byte) (*Transaction, er
 		return nil, fmt.Errorf("Transaction data is required")
 	}
 
+	if network_id == 0 {
+		return nil, fmt.Errorf("Network id is required")
+	}
+
+	if len(contract_addr) == 0 {
+		return nil, fmt.Errorf("Contract address is required")
+	}
+
 	return &Transaction{
-		AppName:     appName,
-		Priority:    priority,
-		Data:        data,
-		SubmittedAt: time.Now(),
+		AppName:         appName,
+		Priority:        priority,
+		NetworkID:       network_id,
+		contractAddress: contract_addr,
+		Data:            data,
+		SubmittedAt:     time.Now(),
 	}, nil
 }
