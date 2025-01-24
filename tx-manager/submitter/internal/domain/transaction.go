@@ -11,7 +11,7 @@ type Transaction struct {
 	AppName         string
 	Priority        int
 	NetworkID       int
-	contractAddress string
+	ContractAddress string
 	Data            []byte
 	SubmittedAt     time.Time
 }
@@ -45,7 +45,7 @@ func NewTransaction(appName string, priority int, network_id int, contract_addr 
 		AppName:         appName,
 		Priority:        priority,
 		NetworkID:       network_id,
-		contractAddress: contract_addr,
+		ContractAddress: contract_addr,
 		Data:            data,
 		SubmittedAt:     time.Now(),
 	}, nil
