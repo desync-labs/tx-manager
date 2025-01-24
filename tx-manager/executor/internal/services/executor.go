@@ -151,7 +151,7 @@ func (e *ExecutorService) processTransaction(tx *domain.Transaction) {
 }
 
 func (e *ExecutorService) executingTransaction(key string, tx *domain.Transaction) error {
-	ex, ok := e.registeredTxExecutors[51]
+	ex, ok := e.registeredTxExecutors[tx.NetworkID]
 	if !ok {
 		slog.Error("No transaction executor found for network", "network_id", 51)
 		return nil

@@ -81,7 +81,7 @@ func (e *EVMTransaction) Execute(key string, tx *domain.Transaction) error {
 
 	// Define the contract address
 	//TODO: Send the contract address in the transaction
-	contractAddr := common.HexToAddress("0x9BDcECf207d1007a03fB3aE7EE4030b4BD3b9803")
+	contractAddr := common.HexToAddress(tx.ContractAddress)
 
 	// Estimate Gas Limit (optional but recommended)
 	msg := ethereum.CallMsg{
