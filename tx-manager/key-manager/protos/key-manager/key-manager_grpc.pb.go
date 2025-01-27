@@ -19,8 +19,9 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	KeyManagerService_AssignKey_FullMethodName = "/KeyManagerService/AssignKey"
-	KeyManagerService_GetKey_FullMethodName    = "/KeyManagerService/GetKey"
+	KeyManagerService_AssignKey_FullMethodName  = "/KeyManagerService/AssignKey"
+	KeyManagerService_GetKey_FullMethodName     = "/KeyManagerService/GetKey"
+	KeyManagerService_ReleaseKey_FullMethodName = "/KeyManagerService/ReleaseKey"
 )
 
 // KeyManagerServiceClient is the client API for KeyManagerService service.
@@ -30,6 +31,7 @@ type KeyManagerServiceClient interface {
 	// Submit a transaction and receive a unique transaction ID
 	AssignKey(ctx context.Context, in *KeyManagerRequest, opts ...grpc.CallOption) (*KeyAssigmentResponse, error)
 	GetKey(ctx context.Context, in *KeyManagerRequest, opts ...grpc.CallOption) (*KeyFetchResponse, error)
+	ReleaseKey(ctx context.Context, in *KeyManagerRequest, opts ...grpc.CallOption) (*KeyReleaseResponse, error)
 }
 
 type keyManagerServiceClient struct {
@@ -60,6 +62,16 @@ func (c *keyManagerServiceClient) GetKey(ctx context.Context, in *KeyManagerRequ
 	return out, nil
 }
 
+func (c *keyManagerServiceClient) ReleaseKey(ctx context.Context, in *KeyManagerRequest, opts ...grpc.CallOption) (*KeyReleaseResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(KeyReleaseResponse)
+	err := c.cc.Invoke(ctx, KeyManagerService_ReleaseKey_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // KeyManagerServiceServer is the server API for KeyManagerService service.
 // All implementations should embed UnimplementedKeyManagerServiceServer
 // for forward compatibility.
@@ -67,6 +79,7 @@ type KeyManagerServiceServer interface {
 	// Submit a transaction and receive a unique transaction ID
 	AssignKey(context.Context, *KeyManagerRequest) (*KeyAssigmentResponse, error)
 	GetKey(context.Context, *KeyManagerRequest) (*KeyFetchResponse, error)
+	ReleaseKey(context.Context, *KeyManagerRequest) (*KeyReleaseResponse, error)
 }
 
 // UnimplementedKeyManagerServiceServer should be embedded to have
@@ -81,6 +94,9 @@ func (UnimplementedKeyManagerServiceServer) AssignKey(context.Context, *KeyManag
 }
 func (UnimplementedKeyManagerServiceServer) GetKey(context.Context, *KeyManagerRequest) (*KeyFetchResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetKey not implemented")
+}
+func (UnimplementedKeyManagerServiceServer) ReleaseKey(context.Context, *KeyManagerRequest) (*KeyReleaseResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ReleaseKey not implemented")
 }
 func (UnimplementedKeyManagerServiceServer) testEmbeddedByValue() {}
 
@@ -138,6 +154,24 @@ func _KeyManagerService_GetKey_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _KeyManagerService_ReleaseKey_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(KeyManagerRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(KeyManagerServiceServer).ReleaseKey(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: KeyManagerService_ReleaseKey_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(KeyManagerServiceServer).ReleaseKey(ctx, req.(*KeyManagerRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // KeyManagerService_ServiceDesc is the grpc.ServiceDesc for KeyManagerService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -152,6 +186,10 @@ var KeyManagerService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetKey",
 			Handler:    _KeyManagerService_GetKey_Handler,
+		},
+		{
+			MethodName: "ReleaseKey",
+			Handler:    _KeyManagerService_ReleaseKey_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

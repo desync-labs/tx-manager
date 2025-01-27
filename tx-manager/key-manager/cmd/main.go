@@ -24,7 +24,7 @@ func main() {
 
 	config, err := config.NewConfig()
 	if err != nil {
-		slog.Error("Error loading config: %v", err)
+		slog.Error("Error loading config", "error", err)
 		panic(err)
 	}
 
@@ -52,20 +52,27 @@ func main() {
 
 	_, err = redisClient.Ping().Result()
 	if err != nil {
-		slog.Error("Failed to connect to Redis: %v", err)
+		slog.Error("Failed to connect to Redis", "error", err)
 		return
 	}
 
 	//TODO: Move to a config file
 	grpcPortEnv := config.PortNumber
 
-	keyManagerService := services.NewKeyManagerService()
+	onePasswordStore := services.NewKeyStore("test-vault", "test-secret")
+	keyManagerService, err := services.NewKeyManagerService(onePasswordStore, 5*time.Second)
+
+	if err != nil {
+		slog.Error("Failed to create key manager service", "error", err)
+		return
+	}
+
 	grpcServer := gRPC.NewGrpcServer(keyManagerService)
 
 	// Start gRPC server asynchronously in a goroutine
 	go func() {
 		if err := grpcServer.Start(grpcPortEnv); err != nil {
-			slog.Error("Failed to start gRPC server: %v", err)
+			slog.Error("Failed to start gRPC server", "error", err)
 		}
 	}()
 

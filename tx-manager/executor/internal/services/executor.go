@@ -146,11 +146,14 @@ func (e *ExecutorService) processTransaction(tx *domain.Transaction) {
 	}
 
 	// Execute the transaction
-	slog.Info("Transaction executed with key", "id", tx.Id, "key", key.Key)
+	slog.Info("Transaction executed with key", "id", tx.Id)
 	e.executingTransaction(key.Key, tx)
 }
 
 func (e *ExecutorService) executingTransaction(key string, tx *domain.Transaction) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
 	ex, ok := e.registeredTxExecutors[tx.NetworkID]
 	if !ok {
 		slog.Error("No transaction executor found for network", "network_id", 51)

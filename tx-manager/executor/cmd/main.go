@@ -79,9 +79,18 @@ func main() {
 
 	executorService := services.NewExecutorService(messageBroker, keyManagerGrpcClient, priorities, ctxExecutorService, 10)
 
-	//Netwotkid and url to be moved to config
-	evm := services.NewEVMTransaction("https://erpc.apothem.network")
+	//TODO: where to move this rpc url ?
+	evm := services.NewEVMTransaction("https://rpc.apothem.network")
 	executorService.RegisterTransactionExecutor(51, evm)
+
+	//Register Solana executer
+	solana := services.NewSolanaTransaction("https://api.devnet.solana.com")
+	executorService.RegisterTransactionExecutor(901, solana)
+
+	//Register Starknet executer
+	// solana := services.NewStarknetTransaction("https://api.devnet.solana.com")
+	// executorService.RegisterTransactionExecutor(901, solana)
+
 	executorService.SetupTransactionListener()
 
 	// Listen for interrupt or termination signals for graceful shutdown

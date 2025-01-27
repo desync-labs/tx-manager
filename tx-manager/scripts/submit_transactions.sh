@@ -2,8 +2,20 @@
 
 ghz --insecure \
   -d '{
-    "app_name": "price-update-app",
+    "app_name": "xdc-app",
     "priority": 1,
+    "network": 51,
+    "contract_address": "0x9BDcECf207d1007a03fB3aE7EE4030b4BD3b9803",
+    "tx_data": "0xbcf8ecf300000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000002584443000000000000000000000000000000000000000000000000000000000043474f0000000000000000000000000000000000000000000000000000000000"
+  }' \
+  -n 3 -c 1 \
+  --call TransactionSubmitter.SubmitTransaction \
+  localhost:50051
+
+  ghz --insecure \
+  -d '{
+    "app_name": "xdc-app",
+    "priority": 3,
     "network": 51,
     "contract_address": "0x9BDcECf207d1007a03fB3aE7EE4030b4BD3b9803",
     "tx_data": "0xbcf8ecf300000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000002584443000000000000000000000000000000000000000000000000000000000043474f0000000000000000000000000000000000000000000000000000000000"
@@ -11,6 +23,18 @@ ghz --insecure \
   -n 1 -c 1 \
   --call TransactionSubmitter.SubmitTransaction \
   localhost:50051
+
+# ghz --insecure \
+#   -d '{
+#     "app_name": "solana-app",
+#     "priority": 2,
+#     "network": 901,
+#     "contract_address": "0x00000000000000000000000000000",
+#     "tx_data": "0xtestdata"
+#   }' \
+#   -n 1 -c 1 \
+#   --call TransactionSubmitter.SubmitTransaction \
+#   localhost:50051
 
   # ghz --insecure \
   # -d '{

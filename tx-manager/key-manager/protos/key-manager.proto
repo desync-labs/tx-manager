@@ -14,6 +14,7 @@ service KeyManagerService {
   // Submit a transaction and receive a unique transaction ID
   rpc AssignKey (KeyManagerRequest) returns (KeyAssigmentResponse);
   rpc GetKey (KeyManagerRequest) returns (KeyFetchResponse);
+  rpc ReleaseKey (KeyManagerRequest) returns (KeyReleaseResponse);
 }
 
 // The transaction request sent to the submitter
@@ -28,4 +29,8 @@ message KeyAssigmentResponse {
 
 message KeyFetchResponse {
   string key = 1;
+}
+
+message KeyReleaseResponse {
+  bool success = 1; 
 }

@@ -52,7 +52,7 @@ func (adapter *GrpcServer) Start(port string) error {
 	go func() {
 		slog.Info("gRPC server listening on port: " + port)
 		if err := grpcServer.Serve(lis); err != nil {
-			slog.Error("gRPC server failed to start: %v", err)
+			slog.Error("gRPC server failed to start", "error", err)
 		}
 	}()
 
@@ -70,13 +70,51 @@ func (s *GrpcServer) AssignKey(ctx context.Context, req *pb.KeyManagerRequest) (
 
 	slog.Debug("Received key assignment request for transaction", "tx-id", req.TxId)
 
+	err := s.keyManagerService.AssignKey(req.TxId, int(req.GetPriority()), context.Background())
+
+	if err != nil {
+		slog.Error("Failed to assign key", "tx-id", req.TxId, "error", err)
+		return &pb.KeyAssigmentResponse{
+			Success: false,
+		}, nil
+
+	}
+
 	return &pb.KeyAssigmentResponse{
 		Success: true,
 	}, nil
 }
 
-func (s *GrpcServer) GetKey(context.Context, *pb.KeyManagerRequest) (*pb.KeyFetchResponse, error) {
+func (s *GrpcServer) GetKey(ctx context.Context, req *pb.KeyManagerRequest) (*pb.KeyFetchResponse, error) {
+
+	slog.Debug("Received key fetch request for transaction", "tx-id", req.TxId)
+
+	pk, err := s.keyManagerService.GetKey(req.TxId, int(req.GetPriority()), context.Background())
+
+	if err != nil {
+		slog.Error("Failed to fetch key", "tx-id", req.TxId, "error", err)
+		return &pb.KeyFetchResponse{
+			Key: "",
+		}, err
+	}
+
 	return &pb.KeyFetchResponse{
-		Key: "test-key",
+		Key: string(pk),
+	}, nil
+}
+
+func (s *GrpcServer) ReleaseKey(ctx context.Context, in *pb.KeyManagerRequest) (*pb.KeyReleaseResponse, error) {
+	slog.Debug("Received key release request for transaction", "tx-id", in.TxId)
+
+	err := s.keyManagerService.ReleaseKey(in.TxId, int(in.GetPriority()), context.Background())
+	if err != nil {
+		slog.Error("Failed to release key", "tx-id", in.TxId, "error", err)
+		return &pb.KeyReleaseResponse{
+			Success: false,
+		}, nil
+	}
+
+	return &pb.KeyReleaseResponse{
+		Success: true,
 	}, nil
 }
