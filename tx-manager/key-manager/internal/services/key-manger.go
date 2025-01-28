@@ -18,7 +18,7 @@ var (
 )
 
 type KeyManagerServiceInterface interface {
-	GetKey(txId string, priority int, ctx context.Context) (privateKey []byte, err error)
+	GetKey(txId string, priority int, ctx context.Context) (publicKey []byte, err error)
 	AssignKey(txId string, priority int, ctx context.Context) (err error)
 	ReleaseKey(txId string, priority int, ctx context.Context) error
 }
@@ -124,7 +124,7 @@ func (k *KeyManagerService) assignP3Keys(txId string) bool {
 
 // GetKey retrieves the private key assigned to the given transaction ID.
 // It returns the key and its priority level, or an error if not found.
-func (k *KeyManagerService) GetKey(txId string, priority int, ctx context.Context) (privateKey []byte, err error) {
+func (k *KeyManagerService) GetKey(txId string, priority int, ctx context.Context) (publicKey []byte, err error) {
 	k.mu.Lock()
 	defer k.mu.Unlock()
 
@@ -132,7 +132,7 @@ func (k *KeyManagerService) GetKey(txId string, priority int, ctx context.Contex
 		// Search in P1Keys
 		for _, keyRecord := range k.keyRecs.P1Keys {
 			if keyRecord.AssignedTransactionId == txId {
-				return keyRecord.PrivateKey, nil
+				return keyRecord.PublicKey, nil
 			}
 		}
 	}
@@ -141,7 +141,7 @@ func (k *KeyManagerService) GetKey(txId string, priority int, ctx context.Contex
 		// Search in P2Keys
 		for _, keyRecord := range k.keyRecs.P2Keys {
 			if keyRecord.AssignedTransactionId == txId {
-				return keyRecord.PrivateKey, nil
+				return keyRecord.PublicKey, nil
 			}
 		}
 	}
@@ -150,7 +150,7 @@ func (k *KeyManagerService) GetKey(txId string, priority int, ctx context.Contex
 		// Search in P3Keys
 		for _, keyRecord := range k.keyRecs.P3Keys {
 			if keyRecord.AssignedTransactionId == txId {
-				return keyRecord.PrivateKey, nil
+				return keyRecord.PublicKey, nil
 			}
 		}
 	}

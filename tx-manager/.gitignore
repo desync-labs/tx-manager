@@ -26,6 +26,8 @@
 *.bak
 *.tmp
 .DS_Store
+keys.json
+./**/keys.json
 
 # Ignore system files
 Thumbs.db

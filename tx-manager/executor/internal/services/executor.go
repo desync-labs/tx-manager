@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"sync"
 
+	cache "github.com/desync-labs/tx-manager/executor/internal/cache"
 	"github.com/desync-labs/tx-manager/executor/internal/domain"
 	broker "github.com/desync-labs/tx-manager/executor/internal/message-broker/interface"
 	pb "github.com/desync-labs/tx-manager/executor/protos/key-manager"
@@ -36,12 +37,13 @@ type ExecutorService struct {
 	taskQueue               chan domain.Transaction
 	wg                      sync.WaitGroup
 	keyManagerServiceClient pb.KeyManagerServiceClient
+	keyCache                cache.KeyCacheInterface
 
 	// map of transaction executor, where key is network id
 	registeredTxExecutors map[int]TransactionExecutorInterface
 }
 
-func NewExecutorService(messageBroker broker.MessageBrokerInterface, keyManagerServiceClient pb.KeyManagerServiceClient, priorities []int, ctx context.Context, workerPoolSize int) *ExecutorService {
+func NewExecutorService(messageBroker broker.MessageBrokerInterface, keyManagerServiceClient pb.KeyManagerServiceClient, keyCache cache.KeyCacheInterface, priorities []int, ctx context.Context, workerPoolSize int) *ExecutorService {
 	ctxExecutorService, cancel := context.WithCancel(ctx)
 	ex := &ExecutorService{
 		messageBroker:           messageBroker,
@@ -52,8 +54,10 @@ func NewExecutorService(messageBroker broker.MessageBrokerInterface, keyManagerS
 		workerPoolSize:          workerPoolSize,
 		taskQueue:               make(chan domain.Transaction, 100),
 		keyManagerServiceClient: keyManagerServiceClient,
+		keyCache:                keyCache,
 		registeredTxExecutors:   make(map[int]TransactionExecutorInterface),
 	}
+
 	return ex
 }
 
@@ -146,7 +150,7 @@ func (e *ExecutorService) processTransaction(tx *domain.Transaction) {
 	}
 
 	// Execute the transaction
-	slog.Info("Transaction executed with key", "id", tx.Id)
+	slog.Info("Transaction executed with public key", "id", tx.Id)
 	e.executingTransaction(key.Key, tx)
 }
 
@@ -159,7 +163,15 @@ func (e *ExecutorService) executingTransaction(key string, tx *domain.Transactio
 		slog.Error("No transaction executor found for network", "network_id", 51)
 		return nil
 	}
-	return ex.Execute(key, tx)
+
+	//Fetch the private key
+	privateKey, err := e.fetchPrivateKey(key)
+	if err != nil {
+		slog.Error("Failed to fetch private key", "public-key", key, "error", err)
+		return err
+	}
+
+	return ex.Execute(privateKey, tx)
 }
 
 func (e *ExecutorService) Shutdown() {
@@ -194,4 +206,15 @@ func (e *ExecutorService) worker(id int) {
 			return
 		}
 	}
+}
+
+func (e *ExecutorService) fetchPrivateKey(publicKey string) (string, error) {
+	slog.Debug("Fetching private key", "public-key", publicKey)
+
+	cacheKey, err := e.keyCache.Get(publicKey)
+	if err != nil {
+		return "", err
+	}
+
+	return cacheKey, nil
 }

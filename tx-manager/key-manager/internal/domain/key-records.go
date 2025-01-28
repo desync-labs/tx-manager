@@ -10,7 +10,6 @@ type KeyRecords struct {
 
 type KeyRecord struct {
 	PublicKey             []byte
-	PrivateKey            []byte
 	AssignedTransactionId string
 	AssignedAt            time.Time // Timestamp when the key was assigned
 }

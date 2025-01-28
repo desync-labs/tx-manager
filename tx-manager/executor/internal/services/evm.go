@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"math/big"
 
+	cache "github.com/desync-labs/tx-manager/executor/internal/cache"
 	"github.com/desync-labs/tx-manager/executor/internal/domain"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
@@ -16,8 +17,9 @@ import (
 )
 
 type EVMTransaction struct {
-	client *ethclient.Client
-	url    string
+	keyCache cache.KeyCacheInterface
+	client   *ethclient.Client
+	url      string
 }
 
 func NewEVMTransaction(url string) *EVMTransaction {
@@ -32,7 +34,7 @@ func NewEVMTransaction(url string) *EVMTransaction {
 func (e *EVMTransaction) setupClient() {
 	client, err := ethclient.Dial(e.url)
 	if err != nil {
-		slog.Error("Failed to connect to the network: %v", err, "network", "apothem")
+		slog.Error("Failed to connect to the network", "error", err)
 	}
 	e.client = client
 }

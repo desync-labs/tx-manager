@@ -23,27 +23,24 @@ func (k *OnePasswordKeyStore) LoadKeys() (*domain.KeyRecords, error) {
 	return k.mockKeys(), nil
 }
 
-// DO NOT COMMIT THIS CODE
+// TODO: Load this configuration from local config file.
 func (k *OnePasswordKeyStore) mockKeys() *domain.KeyRecords {
 	keys := &domain.KeyRecords{
 		P1Keys: []domain.KeyRecord{
 			{
-				PublicKey:             []byte(""),
-				PrivateKey:            []byte(""),
+				PublicKey:             []byte("0xDe47c8c7dfA5FD603b0C0813C19c268391B7857f"),
 				AssignedTransactionId: "",
 			},
 		},
 		P2Keys: []domain.KeyRecord{
 			{
-				PublicKey:             []byte(""),
-				PrivateKey:            []byte(""),
+				PublicKey:             []byte("0x29Ba7FE646498afB6913AFf7B774C1D8B3802713"),
 				AssignedTransactionId: "",
 			},
 		},
 		P3Keys: []domain.KeyRecord{
 			{
-				PublicKey:             []byte(""),
-				PrivateKey:            []byte(""),
+				PublicKey:             []byte("0x5d758B0BEF03Ec903a0AD961381D84A02aCC3a34"),
 				AssignedTransactionId: "",
 			},
 		},

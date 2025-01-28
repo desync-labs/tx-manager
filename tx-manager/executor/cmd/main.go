@@ -2,16 +2,19 @@ package main
 
 import (
 	"context"
+	"log"
 	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	cache "github.com/desync-labs/tx-manager/executor/internal/cache"
 	"github.com/desync-labs/tx-manager/executor/internal/config"
 	messageBroker "github.com/desync-labs/tx-manager/executor/internal/message-broker"
 	services "github.com/desync-labs/tx-manager/executor/internal/services"
 	pb "github.com/desync-labs/tx-manager/executor/protos/key-manager"
+	"github.com/hashicorp/vault/api"
 	"google.golang.org/grpc"
 )
 
@@ -77,9 +80,33 @@ func main() {
 	ctxExecutorService, cancelExecutorService := context.WithCancel(context.Background())
 	defer cancelExecutorService()
 
-	executorService := services.NewExecutorService(messageBroker, keyManagerGrpcClient, priorities, ctxExecutorService, 10)
+	// Initialize Vault client
+	vaultConfig := api.DefaultConfig()
+	vaultConfig.Address = "http://127.0.0.1:8200" //os.Getenv("VAULT_ADDR")
+	if vaultConfig.Address == "" {
+		log.Fatal("VAULT_ADDR environment variable not set")
+	}
+
+	client, err := api.NewClient(vaultConfig)
+	if err != nil {
+		log.Fatalf("Failed to create Vault client: %v", err)
+	}
+
+	// Set Vault token
+	vaultToken := "myroot" //os.Getenv("VAULT_TOKEN")
+	if vaultToken == "" {
+		log.Fatal("VAULT_TOKEN environment variable not set")
+	}
+	client.SetToken(vaultToken)
+
+	// Initialize cache with TTL of 5 minutes
+	cacheTTL := 5 * time.Minute
+
+	cache := cache.NewKeyCache(client, cacheTTL)
+	executorService := services.NewExecutorService(messageBroker, keyManagerGrpcClient, cache, priorities, ctxExecutorService, 10)
 
 	//TODO: where to move this rpc url ?
+
 	evm := services.NewEVMTransaction("https://rpc.apothem.network")
 	executorService.RegisterTransactionExecutor(51, evm)
 
