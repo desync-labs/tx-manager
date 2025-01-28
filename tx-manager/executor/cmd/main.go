@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"log/slog"
 	"os"
@@ -16,19 +17,14 @@ import (
 	pb "github.com/desync-labs/tx-manager/executor/protos/key-manager"
 	"github.com/hashicorp/vault/api"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
-// var appEnv = os.Getenv("APP_ENV")
-// var grpcPortEnv = os.Getenv("GRPC_PORT_ENV")
-// var rabbitMQUrl = os.Getenv("RABBITMQ_URL")
-
 func main() {
-	// Setting up default logger
-	//Todo: Add log level as a configuration
 
 	config, err := config.NewConfig()
 	if err != nil {
-		slog.Error("Error loading config: %v", err)
+		slog.Error("Error loading config", "error", err)
 		panic(err)
 	}
 
@@ -46,20 +42,8 @@ func main() {
 
 	slog.Info("Starting service...", "service name", config.GetApplicationName())
 
-	// Initialize Redis client
-	// redisClient := redis.NewClient(&redis.Options{
-	// 	Addr: config.RedisUrl, // Redis server address
-	// 	DB:   0,               // Default DB
-	// })
-
-	// _, err = redisClient.Ping().Result()
-	// if err != nil {
-	// 	slog.Error("Failed to connect to Redis: %v", err)
-	// 	return
-	// }
-
 	var grpcOpts []grpc.DialOption
-	grpcOpts = append(grpcOpts, grpc.WithInsecure())
+	grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	conn, err := grpc.NewClient(config.KeyManagerServerUrl, grpcOpts...)
 	if err != nil {
 		slog.Error("Failed to create gRPC connection: %v", err)
@@ -71,7 +55,7 @@ func main() {
 
 	messageBroker, err := messageBroker.NewRabbitMQ(config.RabitMQUrl, context.Background())
 	if err != nil {
-		slog.Error("Failed to create message broker: %v", err)
+		slog.Error("Failed to create message broker", "error", err)
 		return
 	}
 
@@ -82,7 +66,10 @@ func main() {
 
 	// Initialize Vault client
 	vaultConfig := api.DefaultConfig()
-	vaultConfig.Address = "http://127.0.0.1:8200" //os.Getenv("VAULT_ADDR")
+	vaultConfig.Address = config.VaultAddress
+
+	slog.Debug("VaultAddress", "addr", vaultConfig.Address)
+
 	if vaultConfig.Address == "" {
 		log.Fatal("VAULT_ADDR environment variable not set")
 	}
@@ -93,7 +80,10 @@ func main() {
 	}
 
 	// Set Vault token
-	vaultToken := "myroot" //os.Getenv("VAULT_TOKEN")
+	vaultToken := config.VaultToken
+
+	slog.Debug("vaultToken", "token", vaultToken)
+
 	if vaultToken == "" {
 		log.Fatal("VAULT_TOKEN environment variable not set")
 	}
@@ -105,18 +95,17 @@ func main() {
 	cache := cache.NewKeyCache(client, cacheTTL)
 	executorService := services.NewExecutorService(messageBroker, keyManagerGrpcClient, cache, priorities, ctxExecutorService, 10)
 
-	//TODO: where to move this rpc url ?
+	factory := services.NewExecutorFactory()
+	for _, chain := range config.ChainConfigs.Chains {
+		executor, err := factory.CreateExecutor(chain.Type, chain.RPCURL)
+		if err != nil {
+			log.Printf("Error creating executor for chain %s: %v", chain.Name, err)
+			continue
+		}
 
-	evm := services.NewEVMTransaction("https://rpc.apothem.network")
-	executorService.RegisterTransactionExecutor(51, evm)
-
-	//Register Solana executer
-	solana := services.NewSolanaTransaction("https://api.devnet.solana.com")
-	executorService.RegisterTransactionExecutor(901, solana)
-
-	//Register Starknet executer
-	// solana := services.NewStarknetTransaction("https://api.devnet.solana.com")
-	// executorService.RegisterTransactionExecutor(901, solana)
+		executorService.RegisterTransactionExecutor(chain.ID, executor)
+		fmt.Printf("Registered executor for chain %s (ID: %d)\n", chain.Name, chain.ID)
+	}
 
 	executorService.SetupTransactionListener()
 

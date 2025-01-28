@@ -1,0 +1,16 @@
+{
+    "chains": [
+        {
+            "id": 51,
+            "name": "Apothem",
+            "type": "evm",
+            "rpc_url": "https://rpc.apothem.network"
+        },
+        {
+            "id": 901,
+            "name": "Solana Devnet",
+            "type": "solana",
+            "rpc_url": "https://api.devnet.solana.com"
+        }
+    ]
+}

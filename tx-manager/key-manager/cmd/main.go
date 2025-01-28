@@ -56,7 +56,6 @@ func main() {
 		return
 	}
 
-	//TODO: Move to a config file
 	grpcPortEnv := config.PortNumber
 
 	keyStore := services.NewKeyStore("./internal/config/public-keys.json")
