@@ -59,8 +59,8 @@ func main() {
 	//TODO: Move to a config file
 	grpcPortEnv := config.PortNumber
 
-	onePasswordStore := services.NewKeyStore("test-vault", "test-secret")
-	keyManagerService, err := services.NewKeyManagerService(onePasswordStore, 5*time.Second)
+	keyStore := services.NewKeyStore("./internal/config/keys.json")
+	keyManagerService, err := services.NewKeyManagerService(keyStore, 5*time.Second)
 
 	if err != nil {
 		slog.Error("Failed to create key manager service", "error", err)

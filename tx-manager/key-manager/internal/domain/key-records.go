@@ -2,6 +2,12 @@ package domain
 
 import "time"
 
+type JsonKeyRecords struct {
+	P1Keys []string `json:"P1Keys"`
+	P2Keys []string `json:"P2Keys"`
+	P3Keys []string `json:"P3Keys"`
+}
+
 type KeyRecords struct {
 	P1Keys []KeyRecord
 	P2Keys []KeyRecord
