@@ -1,11 +1,10 @@
 package domain
 
 import (
-	"log/slog"
 	"time"
 )
 
-type AllKeyRecords map[string]KeyRecords
+type AllKeyRecords map[string]*KeyRecords
 type AllJsonKeyRecords map[string]JsonKeyRecords
 
 type JsonKeyRecords struct {
@@ -15,9 +14,9 @@ type JsonKeyRecords struct {
 }
 
 type KeyRecords struct {
-	P1Keys []KeyRecord
-	P2Keys []KeyRecord
-	P3Keys []KeyRecord
+	P1Keys []*KeyRecord
+	P2Keys []*KeyRecord
+	P3Keys []*KeyRecord
 }
 
 type KeyRecord struct {
@@ -40,5 +39,4 @@ func (k *KeyRecord) AssignTransaction(txId string) {
 // Unassign a transaction from the key
 func (k *KeyRecord) UnassignTransaction() {
 	k.AssignedTransactionId = ""
-	slog.Debug("UnassignTransaction()", "tx-id", k.AssignedTransactionId)
 }

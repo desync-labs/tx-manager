@@ -7,21 +7,14 @@ import (
 	"syscall"
 	"time"
 
-	// gRPC "github.com/desync-labs/tx-manager/submitter/internal/grpc"
 	"github.com/desync-labs/tx-manager/key-manager/internal/config"
 	gRPC "github.com/desync-labs/tx-manager/key-manager/internal/grpc"
 	services "github.com/desync-labs/tx-manager/key-manager/internal/services"
 	"github.com/go-redis/redis"
 )
 
-// var appEnv = os.Getenv("APP_ENV")
-// var grpcPortEnv = os.Getenv("GRPC_PORT_ENV")
-// var rabbitMQUrl = os.Getenv("RABBITMQ_URL")
-
 func main() {
 	// Setting up default logger
-	//Todo: Add log level as a configuration
-
 	config, err := config.NewConfig()
 	if err != nil {
 		slog.Error("Error loading config", "error", err)
@@ -59,7 +52,13 @@ func main() {
 	grpcPortEnv := config.PortNumber
 
 	keyStore := services.NewKeyStore("./internal/config/public-keys.json")
-	keyManagerService, err := services.NewKeyManagerService(keyStore, 5*time.Second)
+
+	recs, err := keyStore.LoadKeys()
+	if err != nil {
+		return
+	}
+
+	keyManagerService, err := services.NewKeyManagerService(recs, 5*time.Second)
 
 	if err != nil {
 		slog.Error("Failed to create key manager service", "error", err)

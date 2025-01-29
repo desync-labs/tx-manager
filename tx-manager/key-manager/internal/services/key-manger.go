@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"errors"
-	"log"
 	"log/slog"
 	"sync"
 	"time"
@@ -24,7 +23,7 @@ type KeyManagerServiceInterface interface {
 }
 
 type KeyManagerService struct {
-	keyStore        KeyStoreInterface
+	// keyStore        *KeyStore
 	keyRecs         *domain.AllKeyRecords
 	mu              sync.Mutex
 	timeoutDuration time.Duration
@@ -32,16 +31,11 @@ type KeyManagerService struct {
 
 }
 
-func NewKeyManagerService(keyStore KeyStoreInterface, timeout time.Duration) (*KeyManagerService, error) {
+func NewKeyManagerService(keyRecs *domain.AllKeyRecords, timeout time.Duration) (*KeyManagerService, error) {
 	kms := &KeyManagerService{
-		keyStore:        keyStore,
-		keyRecs:         &domain.AllKeyRecords{},
+		keyRecs:         keyRecs,
 		timeoutDuration: timeout,
 		stopChan:        make(chan struct{})}
-
-	if err := kms.loadKeys(); err != nil {
-		return nil, err
-	}
 
 	go kms.startTimeoutChecker()
 
@@ -203,15 +197,6 @@ func (k *KeyManagerService) ReleaseKey(txId string, priority int, networkId stri
 	return errors.New("no key found assigned to the given transaction ID")
 }
 
-func (k *KeyManagerService) loadKeys() error {
-	recs, err := k.keyStore.LoadKeys()
-	if err != nil {
-		return err
-	}
-	k.keyRecs = recs
-	return nil
-}
-
 // timeout auto release logic of keys
 // startTimeoutChecker starts a background goroutine that periodically checks for expired key assignments.
 func (k *KeyManagerService) startTimeoutChecker() {
@@ -224,7 +209,7 @@ func (k *KeyManagerService) startTimeoutChecker() {
 		case <-ticker.C:
 			k.releaseExpiredKeys()
 		case <-k.stopChan:
-			log.Println("Stopping timeout checker goroutine.")
+			slog.Debug("Stopping timeout checker goroutine.")
 			return
 		}
 	}
@@ -244,9 +229,6 @@ func (k *KeyManagerService) releaseExpiredKeys() {
 		// Check P1Keys
 		for i := range keyRec.P1Keys {
 			keyRecord := keyRec.P1Keys[i]
-
-			slog.Debug("keyRecord", "tx-id", keyRecord.AssignedTransactionId, "network", networkId)
-
 			if !keyRecord.IsAvailable() && now.Sub(keyRecord.AssignedAt) > k.timeoutDuration {
 				slog.Info("Releasing expired key: %s", "Priority", "P1", "tx-id", keyRecord.AssignedTransactionId)
 				keyRecord.UnassignTransaction()

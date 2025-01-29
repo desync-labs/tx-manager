@@ -42,29 +42,29 @@ func transformRecords(allJson domain.AllJsonKeyRecords) (*domain.AllKeyRecords, 
 	allKeyRecords := make(domain.AllKeyRecords)
 
 	for networkID, jsonRecords := range allJson {
-		keyRecords := domain.KeyRecords{
-			P1Keys: []domain.KeyRecord{},
-			P2Keys: []domain.KeyRecord{},
-			P3Keys: []domain.KeyRecord{},
+		keyRecords := &domain.KeyRecords{
+			P1Keys: []*domain.KeyRecord{},
+			P2Keys: []*domain.KeyRecord{},
+			P3Keys: []*domain.KeyRecord{},
 		}
 
 		// Process P1Keys
 		for _, keyStr := range jsonRecords.P1Keys {
-			keyRecords.P1Keys = append(keyRecords.P1Keys, domain.KeyRecord{
+			keyRecords.P1Keys = append(keyRecords.P1Keys, &domain.KeyRecord{
 				PublicKey: []byte(keyStr),
 			})
 		}
 
 		// Process P2Keys
 		for _, keyStr := range jsonRecords.P2Keys {
-			keyRecords.P2Keys = append(keyRecords.P2Keys, domain.KeyRecord{
+			keyRecords.P2Keys = append(keyRecords.P2Keys, &domain.KeyRecord{
 				PublicKey: []byte(keyStr),
 			})
 		}
 
 		// Process P3Keys
 		for _, keyStr := range jsonRecords.P3Keys {
-			keyRecords.P3Keys = append(keyRecords.P3Keys, domain.KeyRecord{
+			keyRecords.P3Keys = append(keyRecords.P3Keys, &domain.KeyRecord{
 				PublicKey: []byte(keyStr),
 			})
 		}
