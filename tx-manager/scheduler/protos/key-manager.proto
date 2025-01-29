@@ -14,12 +14,14 @@ service KeyManagerService {
   // Submit a transaction and receive a unique transaction ID
   rpc AssignKey (KeyManagerRequest) returns (KeyAssigmentResponse);
   rpc GetKey (KeyManagerRequest) returns (KeyFetchResponse);
+  rpc ReleaseKey (KeyManagerRequest) returns (KeyReleaseResponse);
 }
 
 // The transaction request sent to the submitter
 message KeyManagerRequest {
   string tx_id = 1;      // Name of the submitting application
   Priority priority = 2;      // Priority of the transaction (p1, p2, p3)
+  string network_id = 3;  // Network ID of the transaction
 }
 
 message KeyAssigmentResponse {
@@ -28,4 +30,8 @@ message KeyAssigmentResponse {
 
 message KeyFetchResponse {
   string key = 1;
+}
+
+message KeyReleaseResponse {
+  bool success = 1; 
 }

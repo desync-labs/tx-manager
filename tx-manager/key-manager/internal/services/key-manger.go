@@ -25,7 +25,7 @@ type KeyManagerServiceInterface interface {
 
 type KeyManagerService struct {
 	keyStore        KeyStoreInterface
-	keyRecs         *domain.KeyRecords
+	keyRecs         *domain.AllKeyRecords
 	mu              sync.Mutex
 	timeoutDuration time.Duration
 	stopChan        chan struct{} // Channel to signal stopping the background goroutine
@@ -35,7 +35,7 @@ type KeyManagerService struct {
 func NewKeyManagerService(keyStore KeyStoreInterface, timeout time.Duration) (*KeyManagerService, error) {
 	kms := &KeyManagerService{
 		keyStore:        keyStore,
-		keyRecs:         &domain.KeyRecords{},
+		keyRecs:         &domain.AllKeyRecords{},
 		timeoutDuration: timeout,
 		stopChan:        make(chan struct{})}
 
@@ -50,7 +50,7 @@ func NewKeyManagerService(keyStore KeyStoreInterface, timeout time.Duration) (*K
 
 // AssignKey assigns an available key to the given transaction ID based on priority.
 // It returns the assigned key and its priority level, or an error if no keys are available.
-func (k *KeyManagerService) AssignKey(txId string, priority int, ctx context.Context) (err error) {
+func (k *KeyManagerService) AssignKey(txId string, priority int, networkId string, ctx context.Context) (err error) {
 	k.mu.Lock()
 	defer k.mu.Unlock()
 
@@ -59,25 +59,25 @@ func (k *KeyManagerService) AssignKey(txId string, priority int, ctx context.Con
 	switch priority {
 	case P1:
 		// Attempt to assign a P1 key first
-		ok = k.assignP1Keys(txId)
+		ok = k.assignP1Keys(txId, networkId)
 		if !ok {
 			// If no P1 keys are available, attempt to assign a P2 key
-			ok = k.assignP2Keys(txId)
+			ok = k.assignP2Keys(txId, networkId)
 		}
 		if !ok {
 			// If no P2 keys are available, attempt to assign a P3 key
-			ok = k.assignP3Keys(txId)
+			ok = k.assignP3Keys(txId, networkId)
 		}
 	case P2:
 		// Attempt to assign a P2 keys
-		ok = k.assignP2Keys(txId)
+		ok = k.assignP2Keys(txId, networkId)
 		if !ok {
 			// If no P2 keys are available, attempt to assign a P2 key
-			ok = k.assignP3Keys(txId)
+			ok = k.assignP3Keys(txId, networkId)
 		}
 	case P3:
 		// Attempt to assign a P3 keys
-		ok = k.assignP3Keys(txId)
+		ok = k.assignP3Keys(txId, networkId)
 	default:
 		return errors.New("invalid priority level")
 	}
@@ -89,33 +89,36 @@ func (k *KeyManagerService) AssignKey(txId string, priority int, ctx context.Con
 	return nil
 }
 
-func (k *KeyManagerService) assignP1Keys(txId string) bool {
+func (k *KeyManagerService) assignP1Keys(txId, networkId string) bool {
 	// Attempt to assign a P1 key first
-	for i := range k.keyRecs.P1Keys {
-		if k.keyRecs.P1Keys[i].IsAvailable() {
-			k.keyRecs.P1Keys[i].AssignTransaction(txId)
+	keyRec := (*k.keyRecs)[networkId]
+	for i := range keyRec.P1Keys {
+		if keyRec.P1Keys[i].IsAvailable() {
+			keyRec.P1Keys[i].AssignTransaction(txId)
 			return true
 		}
 	}
 	return false
 }
 
-func (k *KeyManagerService) assignP2Keys(txId string) bool {
+func (k *KeyManagerService) assignP2Keys(txId, networkId string) bool {
 	// Attempt to assign a P2 key first
-	for i := range k.keyRecs.P2Keys {
-		if k.keyRecs.P2Keys[i].IsAvailable() {
-			k.keyRecs.P2Keys[i].AssignTransaction(txId)
+	keyRec := (*k.keyRecs)[networkId]
+	for i := range keyRec.P2Keys {
+		if keyRec.P2Keys[i].IsAvailable() {
+			keyRec.P2Keys[i].AssignTransaction(txId)
 			return true
 		}
 	}
 	return false
 }
 
-func (k *KeyManagerService) assignP3Keys(txId string) bool {
+func (k *KeyManagerService) assignP3Keys(txId, networkId string) bool {
 	// Attempt to assign a P3 key first
-	for i := range k.keyRecs.P3Keys {
-		if k.keyRecs.P3Keys[i].IsAvailable() {
-			k.keyRecs.P3Keys[i].AssignTransaction(txId)
+	keyRec := (*k.keyRecs)[networkId]
+	for i := range keyRec.P3Keys {
+		if keyRec.P3Keys[i].IsAvailable() {
+			keyRec.P3Keys[i].AssignTransaction(txId)
 			return true
 		}
 	}
@@ -124,13 +127,15 @@ func (k *KeyManagerService) assignP3Keys(txId string) bool {
 
 // GetKey retrieves the private key assigned to the given transaction ID.
 // It returns the key and its priority level, or an error if not found.
-func (k *KeyManagerService) GetKey(txId string, priority int, ctx context.Context) (publicKey []byte, err error) {
+func (k *KeyManagerService) GetKey(txId string, priority int, networkId string, ctx context.Context) (publicKey []byte, err error) {
 	k.mu.Lock()
 	defer k.mu.Unlock()
 
+	keyRec := (*k.keyRecs)[networkId]
+
 	if priority == P1 {
 		// Search in P1Keys
-		for _, keyRecord := range k.keyRecs.P1Keys {
+		for _, keyRecord := range keyRec.P1Keys {
 			if keyRecord.AssignedTransactionId == txId {
 				return keyRecord.PublicKey, nil
 			}
@@ -139,7 +144,7 @@ func (k *KeyManagerService) GetKey(txId string, priority int, ctx context.Contex
 
 	if priority == P1 || priority == P2 {
 		// Search in P2Keys
-		for _, keyRecord := range k.keyRecs.P2Keys {
+		for _, keyRecord := range keyRec.P2Keys {
 			if keyRecord.AssignedTransactionId == txId {
 				return keyRecord.PublicKey, nil
 			}
@@ -148,7 +153,7 @@ func (k *KeyManagerService) GetKey(txId string, priority int, ctx context.Contex
 
 	if priority == P1 || priority == P2 || priority == P3 {
 		// Search in P3Keys
-		for _, keyRecord := range k.keyRecs.P3Keys {
+		for _, keyRecord := range keyRec.P3Keys {
 			if keyRecord.AssignedTransactionId == txId {
 				return keyRecord.PublicKey, nil
 			}
@@ -159,15 +164,17 @@ func (k *KeyManagerService) GetKey(txId string, priority int, ctx context.Contex
 }
 
 // ReleaseKey releases the key assigned to the given transaction ID, making it available for reassignment.
-func (k *KeyManagerService) ReleaseKey(txId string, priority int, ctx context.Context) error {
+func (k *KeyManagerService) ReleaseKey(txId string, priority int, networkId string, ctx context.Context) error {
 	k.mu.Lock()
 	defer k.mu.Unlock()
 
+	keyRec := (*k.keyRecs)[networkId]
+
 	if priority == P1 {
 		// Search in P1Keys
-		for i := range k.keyRecs.P1Keys {
-			if k.keyRecs.P1Keys[i].AssignedTransactionId == txId {
-				k.keyRecs.P1Keys[i].UnassignTransaction()
+		for i := range keyRec.P1Keys {
+			if keyRec.P1Keys[i].AssignedTransactionId == txId {
+				keyRec.P1Keys[i].UnassignTransaction()
 				return nil
 			}
 		}
@@ -175,9 +182,9 @@ func (k *KeyManagerService) ReleaseKey(txId string, priority int, ctx context.Co
 
 	if priority == P1 || priority == P2 {
 		// Search in P2Keys
-		for i := range k.keyRecs.P2Keys {
-			if k.keyRecs.P2Keys[i].AssignedTransactionId == txId {
-				k.keyRecs.P2Keys[i].UnassignTransaction()
+		for i := range keyRec.P2Keys {
+			if keyRec.P2Keys[i].AssignedTransactionId == txId {
+				keyRec.P2Keys[i].UnassignTransaction()
 				return nil
 			}
 		}
@@ -185,9 +192,9 @@ func (k *KeyManagerService) ReleaseKey(txId string, priority int, ctx context.Co
 
 	if priority == P1 || priority == P2 || priority == P3 {
 		// Search in P3Keys
-		for i := range k.keyRecs.P3Keys {
-			if k.keyRecs.P3Keys[i].AssignedTransactionId == txId {
-				k.keyRecs.P3Keys[i].UnassignTransaction()
+		for i := range keyRec.P3Keys {
+			if keyRec.P3Keys[i].AssignedTransactionId == txId {
+				keyRec.P3Keys[i].UnassignTransaction()
 				return nil
 			}
 		}
@@ -230,32 +237,41 @@ func (k *KeyManagerService) releaseExpiredKeys() {
 
 	now := time.Now()
 
-	// Check P1Keys
-	for i := range k.keyRecs.P1Keys {
-		keyRecord := &k.keyRecs.P1Keys[i]
-		if !keyRecord.IsAvailable() && now.Sub(keyRecord.AssignedAt) > k.timeoutDuration {
-			slog.Info("Releasing expired key: %s", "Priority", "P1", "Tx Id", keyRecord.AssignedTransactionId)
-			keyRecord.UnassignTransaction()
+	for networkId := range *k.keyRecs {
+
+		keyRec := (*k.keyRecs)[networkId]
+
+		// Check P1Keys
+		for i := range keyRec.P1Keys {
+			keyRecord := keyRec.P1Keys[i]
+
+			slog.Debug("keyRecord", "tx-id", keyRecord.AssignedTransactionId, "network", networkId)
+
+			if !keyRecord.IsAvailable() && now.Sub(keyRecord.AssignedAt) > k.timeoutDuration {
+				slog.Info("Releasing expired key: %s", "Priority", "P1", "tx-id", keyRecord.AssignedTransactionId)
+				keyRecord.UnassignTransaction()
+			}
+		}
+
+		// Check P2Keys
+		for i := range keyRec.P2Keys {
+			keyRecord := keyRec.P2Keys[i]
+			if !keyRecord.IsAvailable() && now.Sub(keyRecord.AssignedAt) > k.timeoutDuration {
+				slog.Info("Releasing expired key: %s", "Priority", "P2", "tx-id", keyRecord.AssignedTransactionId)
+				keyRecord.UnassignTransaction()
+			}
+		}
+
+		// Check P3Keys
+		for i := range keyRec.P3Keys {
+			keyRecord := keyRec.P3Keys[i]
+			if !keyRecord.IsAvailable() && now.Sub(keyRecord.AssignedAt) > k.timeoutDuration {
+				slog.Info("Releasing expired key: %s", "Priority", "P3", "tx-id", keyRecord.AssignedTransactionId)
+				keyRecord.UnassignTransaction()
+			}
 		}
 	}
 
-	// Check P2Keys
-	for i := range k.keyRecs.P2Keys {
-		keyRecord := &k.keyRecs.P2Keys[i]
-		if !keyRecord.IsAvailable() && now.Sub(keyRecord.AssignedAt) > k.timeoutDuration {
-			slog.Info("Releasing expired key: %s", "Priority", "P2", "Tx Id", keyRecord.AssignedTransactionId)
-			keyRecord.UnassignTransaction()
-		}
-	}
-
-	// Check P3Keys
-	for i := range k.keyRecs.P3Keys {
-		keyRecord := &k.keyRecs.P3Keys[i]
-		if !keyRecord.IsAvailable() && now.Sub(keyRecord.AssignedAt) > k.timeoutDuration {
-			slog.Info("Releasing expired key: %s", "Priority", "P3", "Tx Id", keyRecord.AssignedTransactionId)
-			keyRecord.UnassignTransaction()
-		}
-	}
 }
 
 // Stop stops the background timeout checker goroutine.

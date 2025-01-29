@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"sync"
 	"time"
 
@@ -137,8 +138,9 @@ func (e *ExecutorService) processTransaction(tx *domain.Transaction) {
 
 	//Fetch the key from key manager
 	key, err := e.keyManagerServiceClient.GetKey(e.ctx, &pb.KeyManagerRequest{
-		TxId:     tx.Id,
-		Priority: pb.Priority(tx.Priority),
+		TxId:      tx.Id,
+		Priority:  pb.Priority(tx.Priority),
+		NetworkId: strconv.Itoa(tx.NetworkID),
 	})
 
 	//Todo: add the transaction to DLQ

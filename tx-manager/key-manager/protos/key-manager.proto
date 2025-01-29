@@ -21,6 +21,7 @@ service KeyManagerService {
 message KeyManagerRequest {
   string tx_id = 1;      // Name of the submitting application
   Priority priority = 2;      // Priority of the transaction (p1, p2, p3)
+  string network_id = 3;  // Network ID of the transaction
 }
 
 message KeyAssigmentResponse {

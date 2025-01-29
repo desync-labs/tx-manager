@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"sync"
 	"time"
 
@@ -118,10 +119,11 @@ func (s *SchedulerService) closePriorityChannel(priority int) {
 // Use 2-phase commit approach to first lock the key for transaction and then call executer to perform execution
 func (s *SchedulerService) scheduleTransaction(tx *domain.Transaction) {
 	// Receive the transaction
-	slog.Info("Schedule new transaction", "id", tx.Id)
+	slog.Info("Schedule new transaction", "id", tx.Id, "network", tx.NetworkID, "priority", tx.Priority)
 	resp, err := s.keyManagerServiceClient.AssignKey(context.Background(), &pb.KeyManagerRequest{
-		TxId:     tx.Id,
-		Priority: pb.Priority(tx.Priority),
+		TxId:      tx.Id,
+		Priority:  pb.Priority(tx.Priority),
+		NetworkId: strconv.Itoa(tx.NetworkID),
 	})
 
 	//TODO: Handle error, either retry or add to dead letter queue

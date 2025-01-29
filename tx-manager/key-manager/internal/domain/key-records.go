@@ -1,6 +1,12 @@
 package domain
 
-import "time"
+import (
+	"log/slog"
+	"time"
+)
+
+type AllKeyRecords map[string]KeyRecords
+type AllJsonKeyRecords map[string]JsonKeyRecords
 
 type JsonKeyRecords struct {
 	P1Keys []string `json:"P1Keys"`
@@ -15,9 +21,9 @@ type KeyRecords struct {
 }
 
 type KeyRecord struct {
-	PublicKey             []byte
-	AssignedTransactionId string
-	AssignedAt            time.Time // Timestamp when the key was assigned
+	PublicKey             []byte    `json:"PublicKey"`
+	AssignedTransactionId string    `json:"AssignedTransactionId,omitempty"`
+	AssignedAt            time.Time `json:"AssignedAt,omitempty"`
 }
 
 // Check if the key is available
@@ -34,4 +40,5 @@ func (k *KeyRecord) AssignTransaction(txId string) {
 // Unassign a transaction from the key
 func (k *KeyRecord) UnassignTransaction() {
 	k.AssignedTransactionId = ""
+	slog.Debug("UnassignTransaction()", "tx-id", k.AssignedTransactionId)
 }

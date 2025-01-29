@@ -70,7 +70,7 @@ func (s *GrpcServer) AssignKey(ctx context.Context, req *pb.KeyManagerRequest) (
 
 	slog.Debug("Received key assignment request for transaction", "tx-id", req.TxId)
 
-	err := s.keyManagerService.AssignKey(req.TxId, int(req.GetPriority()), context.Background())
+	err := s.keyManagerService.AssignKey(req.TxId, int(req.GetPriority()), req.NetworkId, context.Background())
 
 	if err != nil {
 		slog.Error("Failed to assign key", "tx-id", req.TxId, "error", err)
@@ -89,7 +89,7 @@ func (s *GrpcServer) GetKey(ctx context.Context, req *pb.KeyManagerRequest) (*pb
 
 	slog.Debug("Received key fetch request for transaction", "tx-id", req.TxId)
 
-	pk, err := s.keyManagerService.GetKey(req.TxId, int(req.GetPriority()), context.Background())
+	pk, err := s.keyManagerService.GetKey(req.TxId, int(req.GetPriority()), req.NetworkId, context.Background())
 
 	if err != nil {
 		slog.Error("Failed to fetch key", "tx-id", req.TxId, "error", err)
@@ -106,7 +106,7 @@ func (s *GrpcServer) GetKey(ctx context.Context, req *pb.KeyManagerRequest) (*pb
 func (s *GrpcServer) ReleaseKey(ctx context.Context, in *pb.KeyManagerRequest) (*pb.KeyReleaseResponse, error) {
 	slog.Debug("Received key release request for transaction", "tx-id", in.TxId)
 
-	err := s.keyManagerService.ReleaseKey(in.TxId, int(in.GetPriority()), context.Background())
+	err := s.keyManagerService.ReleaseKey(in.TxId, int(in.GetPriority()), in.NetworkId, context.Background())
 	if err != nil {
 		slog.Error("Failed to release key", "tx-id", in.TxId, "error", err)
 		return &pb.KeyReleaseResponse{
