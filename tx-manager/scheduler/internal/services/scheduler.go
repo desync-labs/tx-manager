@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -132,6 +133,15 @@ func (s *SchedulerService) scheduleTransaction(tx *domain.Transaction) {
 	//TODO: Handle no key, add to dead letter queue
 	if !resp.Success {
 		slog.Error("No key avaiable, adding to dead letter queue", "tx-id", tx.Id)
+
+		// Publish transaction status to message broker
+		tx_status := &domain.TransactionStatus{
+			Id:       tx.Id,
+			Status:   domain.Tx_Status_Error,
+			At:       time.Now(),
+			Response: fmt.Sprintf("No key available for transaction %s", tx.Id),
+		}
+		s.messageBroker.PublishObject(mb.Tx_Status_Exchange, tx_status, -1, context.Background())
 		return
 	}
 
