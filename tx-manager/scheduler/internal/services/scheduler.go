@@ -5,19 +5,14 @@ import (
 	"encoding/json"
 	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/desync-labs/tx-manager/scheduler/internal/domain"
+	mb "github.com/desync-labs/tx-manager/scheduler/internal/message-broker"
 	broker "github.com/desync-labs/tx-manager/scheduler/internal/message-broker/interface"
 	pb "github.com/desync-labs/tx-manager/scheduler/protos/key-manager"
 )
 
-const (
-	// Topic to submit transactions, for rabbitmq this is exchange name
-	submit_topic  = "tx_submit"
-	execute_topic = "tx_executor"
-)
-
-// TODO: naming convention for interface
 type SchedulerServiceInterface interface {
 	SetupTransactionListener() error
 }
@@ -77,7 +72,7 @@ func (s *SchedulerService) listenForNewTransactionForPriority(priority int, chNe
 	// Listen for new transactions
 	slog.Info("Listening for new transactions", "priority", priority)
 
-	s.messageBroker.ListenForMessages(submit_topic, priority, func(body []byte, ctx context.Context) {
+	s.messageBroker.ListenForMessages(mb.Submit_Exchange, priority, func(body []byte, ctx context.Context) {
 		tx := &domain.Transaction{}
 		err := json.Unmarshal(body, tx)
 		if err != nil {
@@ -141,9 +136,16 @@ func (s *SchedulerService) scheduleTransaction(tx *domain.Transaction) {
 	}
 
 	slog.Info("Key assigned successfully", "tx-id", tx.Id)
+	s.messageBroker.PublishObject(mb.Executor_Exchange, tx, tx.Priority, context.Background())
 
-	//TODO: Sent transaction to another exhange tx_execute executer will pick it up for execution
-	s.messageBroker.PublishObject(execute_topic, tx, tx.Priority, context.Background())
+	// Publish transaction status to message broker
+	tx_status := &domain.TransactionStatus{
+		Id:       tx.Id,
+		Status:   domain.Tx_Status_Scheduled,
+		At:       time.Now(),
+		Response: "Transaction scheduled for execution",
+	}
+	s.messageBroker.PublishObject(mb.Tx_Status_Exchange, tx_status, -1, context.Background())
 }
 
 func (s *SchedulerService) Shutdown() {

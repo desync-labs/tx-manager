@@ -5,6 +5,16 @@ import (
 	"time"
 )
 
+const (
+	Tx_Status_None      = 0
+	Tx_Status_Submitted = 1
+	Tx_Status_Scheduled = 2
+	Tx_Status_Executing = 3
+	Tx_Status_Confirmed = 4
+	Tx_Status_TimedOut  = 5
+	Tx_Status_Error     = 100
+)
+
 // Transaction is a domain model for a transaction
 type Transaction struct {
 	Id              string
@@ -14,6 +24,34 @@ type Transaction struct {
 	ContractAddress string
 	Data            []byte
 	SubmittedAt     time.Time
+}
+
+// TransactionStatus is a domain model for a transaction status
+type TransactionStatus struct {
+	Id       string
+	Status   int
+	Response string
+	Metadata map[string]string
+	At       time.Time
+}
+
+func NewTransactionStatus(txId string, status int, response string) (*TransactionStatus, error) {
+
+	if txId == "" {
+		return nil, fmt.Errorf("transaction id is required")
+	}
+
+	if status < 0 {
+		return nil, fmt.Errorf("invalid tx status value")
+	}
+
+	return &TransactionStatus{
+		Id:       txId,
+		Status:   status,
+		Response: response,
+		Metadata: make(map[string]string),
+		At:       time.Now(),
+	}, nil
 }
 
 func NewTransaction(appName string, priority int, network_id int, contract_addr string, data []byte) (*Transaction, error) {

@@ -16,7 +16,7 @@ func NewExecutorFactory() *ExecutorFactory {
 func (f *ExecutorFactory) CreateExecutor(chainType, rpcURL string) (TransactionExecutorInterface, error) {
 	switch chainType {
 	case "evm":
-		return NewEVMTransaction(rpcURL), nil
+		return NewEVMTransaction(rpcURL, 30), nil
 	case "solana":
 		return NewSolanaTransaction(rpcURL), nil
 	// Add cases for other chain types

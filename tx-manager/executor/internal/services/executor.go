@@ -3,18 +3,16 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"sync"
+	"time"
 
 	cache "github.com/desync-labs/tx-manager/executor/internal/cache"
 	"github.com/desync-labs/tx-manager/executor/internal/domain"
+	mb "github.com/desync-labs/tx-manager/executor/internal/message-broker"
 	broker "github.com/desync-labs/tx-manager/executor/internal/message-broker/interface"
 	pb "github.com/desync-labs/tx-manager/executor/protos/key-manager"
-)
-
-const (
-	// Topic to execute transactions, for rabbitmq this is exchange name
-	execute_topic = "tx_executor"
 )
 
 type ExecutorServiceInterface interface {
@@ -22,7 +20,7 @@ type ExecutorServiceInterface interface {
 }
 
 type TransactionExecutorInterface interface {
-	Execute(key string, tx *domain.Transaction) error
+	Execute(key string, tx *domain.Transaction) (bool, string, error)
 }
 
 type ExecutorService struct {
@@ -91,7 +89,7 @@ func (e *ExecutorService) listenForNewTransactionForPriority(priority int, chNew
 	// Listen for new transactions
 	slog.Info("Listening for new transactions", "priority", priority)
 
-	e.messageBroker.ListenForMessages(execute_topic, priority, func(body []byte, ctx context.Context) {
+	e.messageBroker.ListenForMessages(mb.Executor_Exchange, priority, func(body []byte, ctx context.Context) {
 		tx := &domain.Transaction{}
 		err := json.Unmarshal(body, tx)
 		if err != nil {
@@ -160,7 +158,8 @@ func (e *ExecutorService) executingTransaction(key string, tx *domain.Transactio
 
 	ex, ok := e.registeredTxExecutors[tx.NetworkID]
 	if !ok {
-		slog.Error("No transaction executor found for network", "network_id", 51)
+		slog.Error("No transaction executor found for network", "network_id", tx.NetworkID)
+		e.publishTransactionEvent(tx.Id, domain.Tx_Status_Error, fmt.Sprintf("No transaction executor found for network %d", tx.NetworkID), nil)
 		return nil
 	}
 
@@ -168,10 +167,55 @@ func (e *ExecutorService) executingTransaction(key string, tx *domain.Transactio
 	privateKey, err := e.fetchPrivateKey(key)
 	if err != nil {
 		slog.Error("Failed to fetch private key", "public-key", key, "error", err)
+		e.publishTransactionEvent(tx.Id, domain.Tx_Status_Error, err.Error(), nil)
 		return err
 	}
 
-	return ex.Execute(privateKey, tx)
+	e.publishTransactionEvent(tx.Id, domain.Tx_Status_Executing, "Transaction is being executed", nil)
+
+	success, txHash, err := ex.Execute(privateKey, tx)
+	if err != nil {
+		slog.Error("Failed to execute transaction", "error", err)
+
+		metaData := make(map[string]string)
+		if txHash != "" {
+			metaData["tx_hash"] = txHash
+		}
+
+		e.publishTransactionEvent(tx.Id, domain.Tx_Status_Error, err.Error(), metaData)
+		return err
+	}
+
+	if success {
+		slog.Info("Transaction executed successfully", "id", tx.Id)
+
+		metaData := make(map[string]string)
+		if txHash != "" {
+			metaData["tx_hash"] = txHash
+		}
+
+		e.publishTransactionEvent(tx.Id, domain.Tx_Status_Confirmed, "Transaction executed successfully", metaData)
+		return nil
+
+	}
+
+	return nil
+}
+
+func (e *ExecutorService) publishTransactionEvent(id string, status int, response string, txMetaData map[string]string) {
+	// Publish transaction status to message broker
+	tx_status := &domain.TransactionStatus{
+		Id:       id,
+		Status:   status,
+		At:       time.Now(),
+		Response: response,
+	}
+
+	if txMetaData != nil {
+		tx_status.Metadata = txMetaData
+	}
+
+	e.messageBroker.PublishObject(mb.Tx_Status_Exchange, tx_status, -1, context.Background())
 }
 
 func (e *ExecutorService) Shutdown() {

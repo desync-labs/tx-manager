@@ -223,7 +223,7 @@ func (r *RabbitMQ) setupRouting() error {
 			return fmt.Errorf("failed to declare exchange %s: %w", ex.exchangeName, err)
 		}
 
-		//Setu queue for each routing key
+		//Setup queue for each routing key
 		for _, rk := range ex.routingKeys {
 			// Declare the queue
 			queue, err := r.ch.QueueDeclare(

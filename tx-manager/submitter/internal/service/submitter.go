@@ -2,22 +2,21 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/desync-labs/tx-manager/submitter/internal/domain"
+	mb "github.com/desync-labs/tx-manager/submitter/internal/message-broker"
 	broker "github.com/desync-labs/tx-manager/submitter/internal/message-broker/interface"
 	pb "github.com/desync-labs/tx-manager/submitter/protos/transaction"
 	"github.com/go-redis/redis"
 )
 
-const (
-	// Topic to submit transactions, for rabbitmq this is exchange name
-	submit_topic = "tx_submit"
-)
-
 type SubmitterServiceInterface interface {
 	SubmitTransaction(*pb.TransactionRequest) (string, error)
+	SetupTransactionStatusEvent() error
 }
 
 // SubmitterService is the service for the submitter
@@ -56,7 +55,40 @@ func (s *SubmitterService) SubmitTransaction(req *pb.TransactionRequest) (string
 	tx.Id = txID
 
 	//publish the transaction to the message broker
-	return tx.Id, s.messageBroker.PublishObject(submit_topic, tx, int(req.GetPriority()), context.Background())
+	err = s.messageBroker.PublishObject(mb.Submit_Exchange, tx, int(req.GetPriority()), context.Background())
+	if err != nil {
+		slog.Error("Failed to publish transaction to message broker", "error", err)
+		return "", err
+	}
+
+	// Publish transaction status to message broker
+	tx_status := &domain.TransactionStatus{
+		Id:       tx.Id,
+		Status:   domain.Tx_Status_Submitted,
+		At:       time.Now(),
+		Response: "Transaction submitted for execution",
+	}
+	s.messageBroker.PublishObject(mb.Tx_Status_Exchange, tx_status, -1, context.Background())
+
+	return txID, nil
+}
+
+func (s *SubmitterService) SetupTransactionStatusEvent() error {
+	// Listen for new transactions
+	slog.Info("Setting up transaction status listener")
+
+	s.messageBroker.ListenForMessages(mb.Tx_Status_Exchange, -1, func(body []byte, ctx context.Context) {
+		txStatus := &domain.TransactionStatus{}
+		err := json.Unmarshal(body, txStatus)
+		if err != nil {
+			slog.Error("Failed to unmarshal message", "error", err)
+			return
+		} else {
+			slog.Info("Received transaction status", "id", txStatus.Id, "status", txStatus.Status, "response", txStatus.Response, "metadata", txStatus.Metadata)
+		}
+	})
+
+	return nil
 }
 
 // generateTransactionID generates a unique transaction ID using Redis INCR command

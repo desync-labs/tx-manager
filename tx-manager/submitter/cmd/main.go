@@ -25,7 +25,7 @@ func main() {
 
 	config, err := config.NewConfig()
 	if err != nil {
-		slog.Error("Error loading config: %v", err)
+		slog.Error("Error loading config", "error", err)
 		panic(err)
 	}
 
@@ -43,7 +43,7 @@ func main() {
 
 	slog.Info("Starting tx submitter service...")
 
-	slog.Debug("Redis URL: %s", config.RedisUrl)
+	slog.Debug("Redis URL", "url", config.RedisUrl)
 
 	// Initialize Redis client
 	redisClient := redis.NewClient(&redis.Options{
@@ -53,7 +53,7 @@ func main() {
 
 	_, err = redisClient.Ping().Result()
 	if err != nil {
-		slog.Error("Failed to connect to Redis: %v", err)
+		slog.Error("Failed to connect to Redis", "error", err)
 		return
 	}
 
@@ -62,18 +62,19 @@ func main() {
 
 	messageBroker, err := messageBroker.NewRabbitMQ(config.RabitMQUrl, context.Background())
 	if err != nil {
-		slog.Error("Failed to create message broker: %v", err)
+		slog.Error("Failed to create message broker", "error", err)
 		return
 	}
 
 	submitterService := services.NewSubmitterService(messageBroker, redisClient)
+	submitterService.SetupTransactionStatusEvent()
 
 	grpcServer := gRPC.NewGrpcServer(submitterService)
 
 	// Start gRPC server asynchronously in a goroutine
 	go func() {
 		if err := grpcServer.Start(grpcPortEnv); err != nil {
-			slog.Error("Failed to start gRPC server: %v", err)
+			slog.Error("Failed to start gRPC server", "error", err)
 		}
 	}()
 

@@ -7,9 +7,12 @@ const (
 	priority2 = "p2"
 	priority3 = "p3"
 
-	submit_exchange   = "tx_submit"
-	schedule_exchange = "tx_schedule"
-	executor_exchange = "tx_executor"
+	txStatusEvent = "event"
+
+	Submit_Exchange    = "tx_submit"
+	Schedule_Exchange  = "tx_schedule"
+	Executor_Exchange  = "tx_executor"
+	Tx_Status_Exchange = "tx_status"
 )
 
 type Exchange struct {
@@ -24,9 +27,10 @@ type Exchanges struct {
 func InitExchanges() *Exchanges {
 	return &Exchanges{
 		Exchanges: []*Exchange{
-			NewExchange(submit_exchange, []string{priority1, priority2, priority3}),
-			NewExchange(schedule_exchange, []string{priority1, priority2, priority3}),
-			NewExchange(executor_exchange, []string{priority1, priority2, priority3}),
+			NewExchange(Submit_Exchange, []string{priority1, priority2, priority3}),
+			NewExchange(Schedule_Exchange, []string{priority1, priority2, priority3}),
+			NewExchange(Executor_Exchange, []string{priority1, priority2, priority3}),
+			NewExchange(Tx_Status_Exchange, []string{txStatusEvent}),
 		},
 	}
 }
@@ -47,8 +51,11 @@ func NewExchange(exchangeName string, routingKeys []string) *Exchange {
 	}
 }
 
+// If priority is -1, it returns the first routing key
 func (e *Exchange) RoutingKey(priority int) (string, error) {
 	switch priority {
+	case -1:
+		return e.routingKeys[0], nil
 	case 1:
 		return "p1", nil
 	case 2:
@@ -64,8 +71,10 @@ func (e *Exchange) Queue(routingKey string) string {
 	return queueName
 }
 
-func (r *Exchange) RoutingKeyFromPriority(priority int) (string, error) {
+func (e *Exchange) RoutingKeyFromPriority(priority int) (string, error) {
 	switch priority {
+	case -1:
+		return e.routingKeys[0], nil
 	case 1:
 		return "p1", nil
 	case 2:
