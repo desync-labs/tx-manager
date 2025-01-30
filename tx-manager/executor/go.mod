@@ -3,7 +3,7 @@ module github.com/desync-labs/tx-manager/executor
 go 1.22.6
 
 require (
-	github.com/ethereum/go-ethereum v1.14.12
+	github.com/ethereum/go-ethereum v1.14.13
 	github.com/hashicorp/vault/api v1.15.0
 	github.com/joho/godotenv v1.5.1
 	github.com/streadway/amqp v1.1.0
