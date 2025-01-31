@@ -12,11 +12,13 @@ import (
 	broker "github.com/desync-labs/tx-manager/submitter/internal/message-broker/interface"
 	pb "github.com/desync-labs/tx-manager/submitter/protos/transaction"
 	"github.com/go-redis/redis"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type SubmitterServiceInterface interface {
 	SubmitTransaction(*pb.TransactionRequest) (string, error)
 	SetupTransactionStatusEvent() error
+	SetupTransactionStatusListener(txID string, statusCh chan<- *pb.TransactionStatusUpdate) error
 }
 
 // SubmitterService is the service for the submitter
@@ -42,7 +44,7 @@ func (s *SubmitterService) SubmitTransaction(req *pb.TransactionRequest) (string
 		[]byte(req.GetTxData()))
 
 	if err != nil {
-		slog.Error("Failed to create transaction: %v", err)
+		slog.Error("Failed to create transaction", "error", err)
 		return "", err
 	}
 
@@ -91,6 +93,47 @@ func (s *SubmitterService) SetupTransactionStatusEvent() error {
 	return nil
 }
 
+func (s *SubmitterService) SetupTransactionStatusListener(txID string, statusCh chan<- *pb.TransactionStatusUpdate) error {
+	slog.Info("Setting up transaction status listener", "tx-id", txID)
+
+	// Listen for messages from the message broker
+	err := s.messageBroker.ListenForMessages(mb.Tx_Status_Exchange, -1, func(body []byte, ctx context.Context) {
+		txStatus := &domain.TransactionStatus{}
+		err := json.Unmarshal(body, txStatus)
+		if err != nil {
+			slog.Error("Failed to unmarshal message", "error", err)
+			return
+		}
+
+		// Filter messages for the specific transaction ID
+		if txStatus.Id != txID {
+			return
+		}
+
+		// Map domain.TransactionStatus to pb.TransactionStatusUpdate
+		pbStatus := &pb.TransactionStatusUpdate{
+			TxKey:     txStatus.Id,
+			Status:    mapDomainStatusToProto(txStatus.Status),
+			Message:   txStatus.Response,
+			Timestamp: timestamppb.New(txStatus.At),
+		}
+
+		// Send the status update to the channel
+		select {
+		case statusCh <- pbStatus:
+		case <-ctx.Done():
+			slog.Info("Context done, stopping status listener:", "tx-id", txID)
+		}
+	})
+
+	if err != nil {
+		slog.Error("Failed to set up transaction status listener", "error", err)
+		return err
+	}
+
+	return nil
+}
+
 // generateTransactionID generates a unique transaction ID using Redis INCR command
 func (s *SubmitterService) generateTransactionID(appName string) (string, error) {
 	// Generate a unique ID using Redis' INCR command
@@ -102,4 +145,26 @@ func (s *SubmitterService) generateTransactionID(appName string) (string, error)
 	// Combine app name and incremented value to form a transaction ID
 	txID := fmt.Sprintf("%s-%d", appName, txNumber)
 	return txID, nil
+}
+
+// mapDomainStatusToProto maps domain.Tx_Status to pb.TransactionStatus
+func mapDomainStatusToProto(status int) pb.TransactionStatus {
+	switch status {
+	case domain.Tx_Status_None:
+		return pb.TransactionStatus_NONE
+	case domain.Tx_Status_Submitted:
+		return pb.TransactionStatus_SUBMITTED
+	case domain.Tx_Status_Scheduled:
+		return pb.TransactionStatus_SCHEDULED
+	case domain.Tx_Status_Executing:
+		return pb.TransactionStatus_EXECUTING
+	case domain.Tx_Status_Confirmed:
+		return pb.TransactionStatus_CONFIRMED
+	case domain.Tx_Status_TimedOut:
+		return pb.TransactionStatus_TIMEDOUT
+	case domain.Tx_Status_Error:
+		return pb.TransactionStatus_ERROR
+	default:
+		return pb.TransactionStatus_NONE
+	}
 }

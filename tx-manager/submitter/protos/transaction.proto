@@ -2,6 +2,8 @@ syntax = "proto3";
 
 option go_package="./transaction";
 
+import "google/protobuf/timestamp.proto";
+
 // Enum for Transaction Priority (p1, p2, p3)
 enum Priority {
   PRIORITY_UNSPECIFIED = 0;  // Default value, not specified
@@ -19,18 +21,23 @@ enum Network {
   SolanaDevnet     = 901;   //Solana Devnet                
 }
 
+
 // Enum for Transaction Status
 enum TransactionStatus {
-    STATUS_UNSPECIFIED = 0;    // Default value, not specified
-    SUBMITTING = 1;            // Transaction is being submitted
-    PROCESSING = 2;            // Transaction is being processed (signed, etc.)
-    COMPLETED = 3;             // Transaction has been completed successfully
-    ERROR = 4;                 // Transaction encountered an error during execution
+    NONE = 0;    // Default value, not specified
+    SUBMITTED = 1;            // Transaction is being submitted
+    SCHEDULED = 2;            // Transaction is being processed (signed, etc.)
+    EXECUTING = 3;             // Transaction has been completed successfully
+    CONFIRMED = 4;                 // Transaction encountered an error during execution
+    TIMEDOUT = 5;                 // Transaction encountered an error during execution
+    ERROR = 100;                 // Transaction encountered an error during execution
   }
 
 service TransactionSubmitter {
   // Submit a transaction and receive a unique transaction ID
   rpc SubmitTransaction (TransactionRequest) returns (TransactionResponse);
+  // Server-Side Streaming RPC for live status updates
+  rpc SubmitTransactionStream(TransactionRequest) returns (stream TransactionStatusUpdate);
 }
 
 // The transaction request sent to the submitter
@@ -46,4 +53,11 @@ message TransactionRequest {
 message TransactionResponse {
   string tx_key = 1;        // Unique transaction ID generated
   TransactionStatus status = 2;        // Status of the submission (e.g., "submitted")
+}
+
+message TransactionStatusUpdate {
+  string tx_key = 1;
+  TransactionStatus status = 2;
+  string message = 3;
+  google.protobuf.Timestamp timestamp = 4;
 }
