@@ -99,15 +99,17 @@ func (s *GrpcServer) SubmitTransactionStream(req *pb.TransactionRequest, stream 
 		if err != nil {
 			errCh <- err
 		}
-		close(statusCh)
+		//close(statusCh)
 	}()
 
 	// Stream status updates to the client
 	for {
 		select {
 		case status, ok := <-statusCh:
+			slog.Debug("Received status update", "status", status)
 			if !ok {
 				// Channel closed, transaction processing is complete
+				slog.Info("Status channel closed, terminating stream")
 				return nil
 			}
 			if err := stream.Send(status); err != nil {
@@ -115,17 +117,21 @@ func (s *GrpcServer) SubmitTransactionStream(req *pb.TransactionRequest, stream 
 				return err
 			}
 
-			// If transaction is completed or failed, close the stream
+			//		If transaction is completed or failed, close the stream
 			if status.Status == pb.TransactionStatus_CONFIRMED || status.Status == pb.TransactionStatus_ERROR {
+				slog.Debug("Transaction completed, closing stream")
+				close(statusCh)
 				return nil
 			}
 
 		case err := <-errCh:
 			slog.Error("Error in status listener: %v", err)
+			close(statusCh)
 			return err
 
 		case <-stream.Context().Done():
 			slog.Info("Stream context done, terminating stream")
+			close(statusCh)
 			return stream.Context().Err()
 		}
 	}

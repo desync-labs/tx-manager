@@ -67,7 +67,7 @@ func main() {
 	}
 
 	submitterService := services.NewSubmitterService(messageBroker, redisClient)
-	submitterService.SetupTransactionStatusEvent()
+	//submitterService.SetupTransactionStatusEvent()
 
 	grpcServer := gRPC.NewGrpcServer(submitterService)
 

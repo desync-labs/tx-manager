@@ -85,8 +85,6 @@ func (s *SubmitterService) SetupTransactionStatusEvent() error {
 		if err != nil {
 			slog.Error("Failed to unmarshal message", "error", err)
 			return
-		} else {
-			slog.Info("Received transaction status", "id", txStatus.Id, "status", txStatus.Status, "response", txStatus.Response, "metadata", txStatus.Metadata)
 		}
 	})
 
@@ -110,12 +108,18 @@ func (s *SubmitterService) SetupTransactionStatusListener(txID string, statusCh 
 			return
 		}
 
+		tx_hash, ok := txStatus.Metadata["txHash"]
+		if !ok {
+			tx_hash = ""
+		}
+
 		// Map domain.TransactionStatus to pb.TransactionStatusUpdate
 		pbStatus := &pb.TransactionStatusUpdate{
 			TxKey:     txStatus.Id,
 			Status:    mapDomainStatusToProto(txStatus.Status),
 			Message:   txStatus.Response,
 			Timestamp: timestamppb.New(txStatus.At),
+			TxHash:    tx_hash,
 		}
 
 		// Send the status update to the channel

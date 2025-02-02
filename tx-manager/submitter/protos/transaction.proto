@@ -60,4 +60,5 @@ message TransactionStatusUpdate {
   TransactionStatus status = 2;
   string message = 3;
   google.protobuf.Timestamp timestamp = 4;
+  string tx_hash = 5;
 }
