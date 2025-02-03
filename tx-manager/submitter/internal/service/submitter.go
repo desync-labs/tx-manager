@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/desync-labs/tx-manager/submitter/internal/domain"
@@ -19,12 +20,16 @@ type SubmitterServiceInterface interface {
 	SubmitTransaction(*pb.TransactionRequest) (string, error)
 	SetupTransactionStatusEvent() error
 	SetupTransactionStatusListener(txID string, statusCh chan<- *pb.TransactionStatusUpdate) error
+
+	SubscribeTxStatus(txID string) (<-chan *pb.TransactionStatusUpdate, func())
+	SetupGlobalTxStatusListener() error
 }
 
 // SubmitterService is the service for the submitter
 type SubmitterService struct {
 	messageBroker broker.MessageBrokerInterface
 	redisClient   *redis.Client
+	txSubscribers sync.Map
 }
 
 func NewSubmitterService(messageBroker broker.MessageBrokerInterface, redisClient *redis.Client) *SubmitterService {
@@ -32,6 +37,86 @@ func NewSubmitterService(messageBroker broker.MessageBrokerInterface, redisClien
 		messageBroker: messageBroker,
 		redisClient:   redisClient,
 	}
+}
+
+// SetupGlobalTxStatusListener is intended to be called once during startup.
+// It listens for messages from the broker and dispatches them to subscribers.
+func (s *SubmitterService) SetupGlobalTxStatusListener() error {
+	slog.Info("Setting up global transaction status listener")
+	err := s.messageBroker.ListenForMessages(mb.Tx_Status_Exchange, -1, func(body []byte, ctx context.Context) {
+		txStatus := &domain.TransactionStatus{}
+		err := json.Unmarshal(body, txStatus)
+		if err != nil {
+			slog.Error("Failed to unmarshal message", "error", err)
+			return
+		}
+
+		// Map domain.TransactionStatus to pb.TransactionStatusUpdate
+		txHash, ok := txStatus.Metadata["txHash"]
+		if !ok {
+			txHash = ""
+		}
+		pbStatus := &pb.TransactionStatusUpdate{
+			TxKey:     txStatus.Id,
+			Status:    mapDomainStatusToProto(txStatus.Status),
+			Message:   txStatus.Response,
+			Timestamp: timestamppb.New(txStatus.At),
+			TxHash:    txHash,
+		}
+
+		// Dispatch the message to subscribers registered for this txID.
+		if subs, ok := s.txSubscribers.Load(txStatus.Id); ok {
+			if channels, ok := subs.([]chan *pb.TransactionStatusUpdate); ok {
+				for _, ch := range channels {
+					select {
+					case ch <- pbStatus:
+					default:
+						slog.Warn("Subscriber channel full", "tx-id", txStatus.Id)
+					}
+				}
+			}
+		} else {
+			slog.Debug("No subscribers for tx status", "tx-id", txStatus.Id)
+		}
+	})
+	if err != nil {
+		slog.Error("Failed to set up global transaction status listener", "error", err)
+		return err
+	}
+	return nil
+}
+
+// SubscribeTxStatus registers a subscriber channel for a specific txID.
+// Returns the channel on which status updates will be sent and an unsubscribe function.
+func (s *SubmitterService) SubscribeTxStatus(txID string) (<-chan *pb.TransactionStatusUpdate, func()) {
+	ch := make(chan *pb.TransactionStatusUpdate, 10) // buffered channel
+	// Load or create an entry for this txID.
+	val, _ := s.txSubscribers.LoadOrStore(txID, []chan *pb.TransactionStatusUpdate{ch})
+	if channels, ok := val.([]chan *pb.TransactionStatusUpdate); ok {
+		// If an entry already exists, append the new channel.
+		s.txSubscribers.Store(txID, append(channels, ch))
+	}
+
+	// Return an unsubscribe function to remove this channel.
+	unsubscribe := func() {
+		if val, ok := s.txSubscribers.Load(txID); ok {
+			if channels, ok := val.([]chan *pb.TransactionStatusUpdate); ok {
+				newChannels := make([]chan *pb.TransactionStatusUpdate, 0, len(channels))
+				for _, c := range channels {
+					if c != ch {
+						newChannels = append(newChannels, c)
+					}
+				}
+				if len(newChannels) == 0 {
+					s.txSubscribers.Delete(txID)
+				} else {
+					s.txSubscribers.Store(txID, newChannels)
+				}
+			}
+		}
+		close(ch)
+	}
+	return ch, unsubscribe
 }
 
 func (s *SubmitterService) SubmitTransaction(req *pb.TransactionRequest) (string, error) {
@@ -105,6 +190,7 @@ func (s *SubmitterService) SetupTransactionStatusListener(txID string, statusCh 
 
 		// Filter messages for the specific transaction ID
 		if txStatus.Id != txID {
+			slog.Warn("Ignoring status update for different transaction", "tx-id", txID, "status-tx-id", txStatus.Id)
 			return
 		}
 
