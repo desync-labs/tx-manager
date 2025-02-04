@@ -7,7 +7,7 @@ ORG="intothefathom"
 
 echo 'Changing directory to node apps'
 
-cd ../submitter
+cd ../../submitter
 
 echo `pwd`
 echo "Creating image... ${APP_NAME}:${VERSION}"
