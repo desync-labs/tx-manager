@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Define the version number as a constant
-VERSION="0.0.1.1-dev"
+VERSION="0.0.1.2-dev"
 NAME="com.fathom.tx-manager.submitter"
 ORG="intothefathom"
 
