@@ -55,7 +55,7 @@ jobs:
       - name: Build Submitter Image
         if: steps.changed-build-files.outputs.any_changed == 'true' && contains(steps.changed-build-files.outputs.all_changed_files, 'build-scripts/build-submitter.sh')
         run: |
-          cd build-scripts
+          cd tx-manager/build-scripts
           ./build-submitter.sh
         env:
           GITHUB_ENV: $GITHUB_ENV         
