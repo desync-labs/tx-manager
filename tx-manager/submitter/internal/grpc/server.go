@@ -13,6 +13,7 @@ import (
 	pb "github.com/desync-labs/tx-manager/submitter/protos/transaction"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type GrpcServer struct {
@@ -66,6 +67,76 @@ func (adapter *GrpcServer) Start(port string) error {
 	return nil
 }
 
+// func (s *GrpcServer) SubmitTransactionStream(req *pb.TransactionRequest, stream pb.TransactionSubmitter_SubmitTransactionStreamServer) error {
+// 	slog.Debug("Received transaction stream request: %v", req)
+
+// 	// Submit the transaction and get the transaction ID
+// 	txID, err := s.submitterService.SubmitTransaction(req)
+// 	if err != nil {
+// 		slog.Error("Failed to submit transaction: %v", err)
+// 		return err
+// 	}
+
+// 	// Send the initial SUBMITTED status
+// 	initialStatus := &pb.TransactionStatusUpdate{
+// 		TxKey:     txID,
+// 		Status:    pb.TransactionStatus_SUBMITTED,
+// 		Message:   "Transaction has been submitted.",
+// 		Timestamp: timestamppb.Now(),
+// 	}
+// 	if err := stream.Send(initialStatus); err != nil {
+// 		slog.Error("Failed to send initial status: %v", err)
+// 		return err
+// 	}
+
+// 	// Subscribe to transaction status updates
+// 	statusCh := make(chan *pb.TransactionStatusUpdate)
+// 	errCh := make(chan error)
+
+// 	go func() {
+// 		// Listen for status updates related to txID
+// 		err := s.submitterService.SetupTransactionStatusListener(txID, statusCh)
+// 		if err != nil {
+// 			errCh <- err
+// 		}
+// 		//close(statusCh)
+// 	}()
+
+// 	// Stream status updates to the client
+// 	for {
+// 		select {
+// 		case status, ok := <-statusCh:
+// 			slog.Debug("Received status update", "status", status)
+// 			if !ok {
+// 				// Channel closed, transaction processing is complete
+// 				slog.Info("Status channel closed, terminating stream")
+// 				return nil
+// 			}
+// 			if err := stream.Send(status); err != nil {
+// 				slog.Error("Failed to send status update: %v", err)
+// 				return err
+// 			}
+
+// 			//		If transaction is completed or failed, close the stream
+// 			if status.Status == pb.TransactionStatus_CONFIRMED || status.Status == pb.TransactionStatus_ERROR {
+// 				slog.Debug("Transaction completed, closing stream")
+// 				close(statusCh)
+// 				return nil
+// 			}
+
+// 		case err := <-errCh:
+// 			slog.Error("Error in status listener: %v", err)
+// 			close(statusCh)
+// 			return err
+
+// 		case <-stream.Context().Done():
+// 			slog.Info("Stream context done, terminating stream")
+// 			close(statusCh)
+// 			return stream.Context().Err()
+// 		}
+// 	}
+// }
+
 func (s *GrpcServer) SubmitTransaction(ctx context.Context, req *pb.TransactionRequest) (*pb.TransactionResponse, error) {
 
 	slog.Debug("Received transaction request: %v", req)
@@ -78,6 +149,58 @@ func (s *GrpcServer) SubmitTransaction(ctx context.Context, req *pb.TransactionR
 
 	return &pb.TransactionResponse{
 		TxKey:  txId,
-		Status: pb.TransactionStatus_SUBMITTING,
+		Status: pb.TransactionStatus_SUBMITTED,
 	}, nil
+}
+
+func (s *GrpcServer) SubmitTransactionStream(req *pb.TransactionRequest, stream pb.TransactionSubmitter_SubmitTransactionStreamServer) error {
+	slog.Debug("Received transaction stream request: %v", req)
+
+	// Submit the transaction and get the transaction ID.
+	txID, err := s.submitterService.SubmitTransaction(req)
+	if err != nil {
+		slog.Error("Failed to submit transaction: %v", err)
+		return err
+	}
+
+	// Send the initial SUBMITTED status.
+	initialStatus := &pb.TransactionStatusUpdate{
+		TxKey:     txID,
+		Status:    pb.TransactionStatus_SUBMITTED,
+		Message:   "Transaction has been submitted.",
+		Timestamp: timestamppb.Now(),
+	}
+	if err := stream.Send(initialStatus); err != nil {
+		slog.Error("Failed to send initial status: %v", err)
+		return err
+	}
+
+	// Subscribe to status updates for this txID.
+	statusCh, unsubscribe := s.submitterService.SubscribeTxStatus(txID)
+	defer unsubscribe() // Ensure we unsubscribe when done.
+
+	// Stream status updates to the client.
+	for {
+		select {
+		case status, ok := <-statusCh:
+			slog.Debug("Received status update", "status", status)
+			if !ok {
+				slog.Info("Status channel closed, terminating stream")
+				return nil
+			}
+			if err := stream.Send(status); err != nil {
+				slog.Error("Failed to send status update: %v", err)
+				return err
+			}
+
+			// If transaction is completed or failed, end the stream.
+			if status.Status == pb.TransactionStatus_CONFIRMED || status.Status == pb.TransactionStatus_ERROR {
+				slog.Debug("Transaction completed, ending stream")
+				return nil
+			}
+		case <-stream.Context().Done():
+			slog.Info("Stream context done, terminating stream")
+			return stream.Context().Err()
+		}
+	}
 }

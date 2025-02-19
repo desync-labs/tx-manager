@@ -55,6 +55,7 @@ func main() {
 
 	recs, err := keyStore.LoadKeys()
 	if err != nil {
+		slog.Error("Failed to load keys", "error", err)
 		return
 	}
 

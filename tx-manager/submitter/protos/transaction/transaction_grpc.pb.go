@@ -19,7 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	TransactionSubmitter_SubmitTransaction_FullMethodName = "/TransactionSubmitter/SubmitTransaction"
+	TransactionSubmitter_SubmitTransaction_FullMethodName       = "/TransactionSubmitter/SubmitTransaction"
+	TransactionSubmitter_SubmitTransactionStream_FullMethodName = "/TransactionSubmitter/SubmitTransactionStream"
 )
 
 // TransactionSubmitterClient is the client API for TransactionSubmitter service.
@@ -28,6 +29,8 @@ const (
 type TransactionSubmitterClient interface {
 	// Submit a transaction and receive a unique transaction ID
 	SubmitTransaction(ctx context.Context, in *TransactionRequest, opts ...grpc.CallOption) (*TransactionResponse, error)
+	// Server-Side Streaming RPC for live status updates
+	SubmitTransactionStream(ctx context.Context, in *TransactionRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[TransactionStatusUpdate], error)
 }
 
 type transactionSubmitterClient struct {
@@ -48,12 +51,33 @@ func (c *transactionSubmitterClient) SubmitTransaction(ctx context.Context, in *
 	return out, nil
 }
 
+func (c *transactionSubmitterClient) SubmitTransactionStream(ctx context.Context, in *TransactionRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[TransactionStatusUpdate], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &TransactionSubmitter_ServiceDesc.Streams[0], TransactionSubmitter_SubmitTransactionStream_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[TransactionRequest, TransactionStatusUpdate]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type TransactionSubmitter_SubmitTransactionStreamClient = grpc.ServerStreamingClient[TransactionStatusUpdate]
+
 // TransactionSubmitterServer is the server API for TransactionSubmitter service.
 // All implementations should embed UnimplementedTransactionSubmitterServer
 // for forward compatibility.
 type TransactionSubmitterServer interface {
 	// Submit a transaction and receive a unique transaction ID
 	SubmitTransaction(context.Context, *TransactionRequest) (*TransactionResponse, error)
+	// Server-Side Streaming RPC for live status updates
+	SubmitTransactionStream(*TransactionRequest, grpc.ServerStreamingServer[TransactionStatusUpdate]) error
 }
 
 // UnimplementedTransactionSubmitterServer should be embedded to have
@@ -65,6 +89,9 @@ type UnimplementedTransactionSubmitterServer struct{}
 
 func (UnimplementedTransactionSubmitterServer) SubmitTransaction(context.Context, *TransactionRequest) (*TransactionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SubmitTransaction not implemented")
+}
+func (UnimplementedTransactionSubmitterServer) SubmitTransactionStream(*TransactionRequest, grpc.ServerStreamingServer[TransactionStatusUpdate]) error {
+	return status.Errorf(codes.Unimplemented, "method SubmitTransactionStream not implemented")
 }
 func (UnimplementedTransactionSubmitterServer) testEmbeddedByValue() {}
 
@@ -104,6 +131,17 @@ func _TransactionSubmitter_SubmitTransaction_Handler(srv interface{}, ctx contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _TransactionSubmitter_SubmitTransactionStream_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(TransactionRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(TransactionSubmitterServer).SubmitTransactionStream(m, &grpc.GenericServerStream[TransactionRequest, TransactionStatusUpdate]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type TransactionSubmitter_SubmitTransactionStreamServer = grpc.ServerStreamingServer[TransactionStatusUpdate]
+
 // TransactionSubmitter_ServiceDesc is the grpc.ServiceDesc for TransactionSubmitter service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -116,6 +154,12 @@ var TransactionSubmitter_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _TransactionSubmitter_SubmitTransaction_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "SubmitTransactionStream",
+			Handler:       _TransactionSubmitter_SubmitTransactionStream_Handler,
+			ServerStreams: true,
+		},
+	},
 	Metadata: "transaction.proto",
 }

@@ -1,14 +1,21 @@
-version: '3'
+version: '3.8'  # Updated to a more recent version for better features
+
 services:
   rabbitmq:
     image: rabbitmq:3-management
     ports:
-      - 5672:5672
-      - 15672:15672
+      - "5672:5672"      # AMQP protocol
+      - "15672:15672"    # Management UI
+    networks:
+      - app-network
+
   redis:
     image: redis:latest
     ports:
-      - 6379:6379
+      - "6379:6379"
+    networks:
+      - app-network
+
   vault:
     image: hashicorp/vault
     container_name: vault-dev
@@ -21,3 +28,123 @@ services:
       - "8200:8200"
     volumes:
       - ./vault-data:/vault/file
+    networks:
+      - app-network
+
+  key-manager:
+    build:
+      context: ./key-manager
+      dockerfile: Dockerfile
+    image: intothefathom/key-manager:latest  # Replace 'yourusername' with your Docker Hub username or preferred registry
+    container_name: key-manager
+    ports:
+      - "50052:50052"  # Host:Container ports (adjust as needed)
+    environment:
+      - GO_ENV=development
+      - GRPC_PORT_ENV=50052  
+      - REDIS_URL=redis:6379
+    volumes:
+      # - ./vault-data:/vault/file
+      - ./key-manager/internal/config:/root/internal/config  # Mount configuration files if necessary
+      # Add other volume mounts if your application requires them
+    depends_on:
+      - rabbitmq
+      - redis
+      - vault
+    networks:
+      - app-network
+    restart: unless-stopped  # Automatically restart the container unless it's explicitly stopped
+
+  executor:
+    build:
+      context: ./executor
+      dockerfile: Dockerfile
+    image: intothefathom/executor:latest
+    container_name: executor
+    # ports:
+    #   - "8081:8080"  # Host:Container ports (adjust as needed)
+    environment:
+      - GO_ENV=development
+      - RABBITMQ_URL=rabbitmq:5672  
+      - RABBITMQ_USERNAME=guest
+      - RABBITMQ_PASSWORD=guest
+      - REDIS_URL=redis:6379
+      - VAULT_ADDR=http://vault:8200
+      - VAULT_TOKEN=myroot
+      - GRPC_KEY_MANAGER_URL=key-manager:50052
+
+    volumes:
+      - ./executor/internal/config:/root/internal/config  
+    depends_on:
+      - rabbitmq
+      - redis
+      - vault
+      - key-manager
+    networks:
+      - app-network
+    restart: unless-stopped  # Automatically restart the container unless it's explicitly stopped
+
+  scheduler:
+    build:
+      context: ./scheduler
+      dockerfile: Dockerfile
+    image: intothefathom/scheduler:latest
+    container_name: scheduler
+    # ports:
+    #   - "50051:50051"  # Host:Container ports (adjust as needed)
+    environment:
+      - GO_ENV=development
+      - GRPC_PORT_ENV=50051
+      - RABBITMQ_URL=rabbitmq:5672  
+      - RABBITMQ_USERNAME=guest
+      - RABBITMQ_PASSWORD=guest
+      - REDIS_URL=redis:6379
+      - GRPC_KEY_MANAGER_URL=key-manager:50052
+
+    volumes:
+      - ./executor/internal/config:/root/internal/config  
+    depends_on:
+      - rabbitmq
+      - redis
+      - vault
+      - key-manager
+    networks:
+      - app-network
+    restart: unless-stopped  # Automatically restart the container unless it's explicitly stopped
+
+  submitter:
+    build:
+      context: ./submitter
+      dockerfile: Dockerfile
+    image: intothefathom/submitter:latest
+    container_name: submitter
+    ports:
+      - "50051:50051"  # Host:Container ports (adjust as needed)
+    environment:
+      - GO_ENV=development
+      - GRPC_PORT_ENV=50051
+      - RABBITMQ_URL=rabbitmq:5672  
+      - RABBITMQ_USERNAME=guest
+      - RABBITMQ_PASSWORD=guest
+      - REDIS_URL=redis:6379
+
+    # volumes:
+    #   - ./executor/internal/config:/root/internal/config  
+    depends_on:
+      - rabbitmq
+      - redis
+      # - vault
+      # - key-manager
+    networks:
+      - app-network
+    restart: unless-stopped  # Automatically restart the container unless it's explicitly stopped
+
+
+# Define networks to allow inter-service communication
+networks:
+  app-network:
+    driver: bridge
+
+# Define named volumes
+volumes:
+  vault-data:
