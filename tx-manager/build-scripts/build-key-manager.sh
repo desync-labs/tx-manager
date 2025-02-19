@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Define the version number as a constant
-VERSION="0.0.1-dev"
+VERSION="0.0.2-dev"
 APP_NAME="com.fathom.tx-manager.key-manager"
 ORG_NAME="intothefathom"
 
