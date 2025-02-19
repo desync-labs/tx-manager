@@ -68,40 +68,21 @@ jobs:
         env:
           GITHUB_ENV: $GITHUB_ENV         
       
-      # #======================================================================================================
-      # #                                      Price Producer Build
-      # #======================================================================================================    
-      # - name: Build Producer Image
-      #   if: steps.changed-build-files.outputs.any_changed == 'true' && contains(steps.changed-build-files.outputs.all_changed_files, 'build-scripts/build-producer.sh')
-      #   run: |
-      #     cd build-scripts
-      #     ./build-producer.sh
-      #   env:
-      #     GITHUB_ENV: $GITHUB_ENV         
+      #======================================================================================================
+      #                                      Scheduler Build
+      #======================================================================================================    
+      - name: Build Scheduler Image
+        if: steps.changed-build-files.outputs.any_changed == 'true' && contains(steps.changed-build-files.outputs.all_changed_files, 'build-scripts/build-scheduler.sh')
+        run: |
+          cd tx-manager/build-scripts
+          ./build-scheduler.sh
+        env:
+          GITHUB_ENV: $GITHUB_ENV         
 
-      # - name: Push Producer Image
-      #   if: steps.changed-build-files.outputs.any_changed == 'true' && contains(steps.changed-build-files.outputs.all_changed_files, 'build-scripts/build-producer.sh')
-      #   run: |
-      #     echo "Pushing PRODUCER_BOT_VERSION :${{ env.PRODUCER_BOT_VERSION }}"
-      #     docker push intothefathom/oracle-producer:${{ env.PRODUCER_BOT_VERSION }}
-      #   env:
-      #     GITHUB_ENV: $GITHUB_ENV         
-
-      # #======================================================================================================
-      # #                                      Price Publisher Build
-      # #======================================================================================================    
-      # - name: Build Publisher Image
-      #   if: steps.changed-build-files.outputs.any_changed == 'true' && contains(steps.changed-build-files.outputs.all_changed_files, 'build-scripts/build-publisher.sh')
-      #   run: |
-      #     cd build-scripts
-      #     ./build-publisher.sh
-      #   env:
-      #     GITHUB_ENV: $GITHUB_ENV         
-
-      # - name: Push Publisher Image
-      #   if: steps.changed-build-files.outputs.any_changed == 'true' && contains(steps.changed-build-files.outputs.all_changed_files, 'build-scripts/build-publisher.sh')
-      #   run: |
-      #     echo "Pushing PUBLISHER_BOT_VERSION :${{ env.PUBLISHER_BOT_VERSION }}"
-      #     docker push intothefathom/oracle-publisher:${{ env.PUBLISHER_BOT_VERSION }}
-      #   env:
-      #     GITHUB_ENV: $GITHUB_ENV  
+      - name: Push Scheduler Image to DockerHub
+        if: steps.changed-build-files.outputs.any_changed == 'true' && contains(steps.changed-build-files.outputs.all_changed_files, 'build-scripts/build-scheduler.sh')
+        run: |
+          echo "Pushing SCHEDULER_VERSION :${{ env.SCHEDULER_VERSION }}"
+          docker push ${{ env.ORG_NAME }}/${{ env.SCHEDULER_NAME }}:${{ env.SCHEDULER_VERSION }}
+        env:
+          GITHUB_ENV: $GITHUB_ENV       
