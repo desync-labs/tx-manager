@@ -17,6 +17,8 @@ echo 'executor image created.'
 
 # Output the version number to be used in the GitHub Action
 echo "EXECUTOR_VERSION=$VERSION" >> $GITHUB_ENV
+echo "EXECUTOR_NAME=$APP_NAME" >> $GITHUB_ENV
+echo "ORG_NAME=$ORG_NAME" >> $GITHUB_ENV
 
 cd ..
 
