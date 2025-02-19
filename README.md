@@ -1,1 +1,2 @@
 #Tx manager
+[![Fathom Transaction Manager Build and Deployment](https://github.com/desync-labs/tx-manager/actions/workflows/ci.yml/badge.svg)](https://github.com/desync-labs/tx-manager/actions/workflows/ci.yml)
