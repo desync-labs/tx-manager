@@ -86,3 +86,41 @@ jobs:
           docker push ${{ env.ORG_NAME }}/${{ env.SCHEDULER_NAME }}:${{ env.SCHEDULER_VERSION }}
         env:
           GITHUB_ENV: $GITHUB_ENV       
+
+      #======================================================================================================
+      #                                      Key-Manager Build
+      #======================================================================================================    
+      - name: Build Key-Manager Image
+        if: steps.changed-build-files.outputs.any_changed == 'true' && contains(steps.changed-build-files.outputs.all_changed_files, 'build-scripts/build-key-manager.sh')
+        run: |
+          cd tx-manager/build-scripts
+          ./build-key-manager.sh
+        env:
+          GITHUB_ENV: $GITHUB_ENV         
+
+      - name: Push Key-Manager Image to DockerHub
+        if: steps.changed-build-files.outputs.any_changed == 'true' && contains(steps.changed-build-files.outputs.all_changed_files, 'build-scripts/build-key-manager.sh')
+        run: |
+          echo "Pushing KEY_MANAGER_VERSION :${{ env.KEY_MANAGER_VERSION }}"
+          docker push ${{ env.ORG_NAME }}/${{ env.KEY_MANAGER_NAME }}:${{ env.KEY_MANAGER_VERSION }}
+        env:
+          GITHUB_ENV: $GITHUB_ENV    
+          
+      #======================================================================================================
+      #                                      Executor Build
+      #======================================================================================================    
+      - name: Build Executor Image
+        if: steps.changed-build-files.outputs.any_changed == 'true' && contains(steps.changed-build-files.outputs.all_changed_files, 'build-scripts/build-executor.sh')
+        run: |
+          cd tx-manager/build-scripts
+          ./build-executor.sh
+        env:
+          GITHUB_ENV: $GITHUB_ENV         
+
+      - name: Push Executor Image to DockerHub
+        if: steps.changed-build-files.outputs.any_changed == 'true' && contains(steps.changed-build-files.outputs.all_changed_files, 'build-scripts/build-executor.sh')
+        run: |
+          echo "Pushing EXECUTOR_VERSION :${{ env.EXECUTOR_VERSION }}"
+          docker push ${{ env.ORG_NAME }}/${{ env.EXECUTOR_NAME }}:${{ env.EXECUTOR_VERSION }}
+        env:
+          GITHUB_ENV: $GITHUB_ENV              
